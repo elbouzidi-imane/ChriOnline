@@ -82,5 +82,5 @@ public class OrderHandler {
             return Message.error("Erreur récupération commande : " + e.getMessage());
         }
     }
-    
+
 }
