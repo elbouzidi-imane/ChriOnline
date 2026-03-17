@@ -1,9 +1,5 @@
 package com.chrionline.server.db;
 
-import com.chrionline.server.repository.CategoryDAO;
-import com.chrionline.server.repository.ProductDAO;
-import com.chrionline.server.repository.UserDAO;
-
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -42,6 +38,7 @@ public class DatabaseManager {
         return DriverManager.getConnection(url, user, password);
     }
 
+    // Test rapide de connexion
     public boolean testConnection() {
         try (Connection conn = getConnection()) {
             System.out.println("Connexion PostgreSQL OK !");
@@ -53,40 +50,7 @@ public class DatabaseManager {
     }
 
     public static void main(String[] args) {
-        System.out.println("==============================");
-        System.out.println("  TEST DatabaseManager + DAOs ");
-        System.out.println("==============================");
-
-        // Test connexion
-        boolean ok = DatabaseManager.getInstance().testConnection();
-        if (!ok) {
-            System.err.println("Arrêt — connexion impossible.");
-            return;
-        }
-
-        // Test UserDAO
-        System.out.println("\n--- UserDAO ---");
-        UserDAO userDAO = new UserDAO();
-        System.out.println("Nombre d'utilisateurs : " + userDAO.findAll().size());
-        userDAO.findAll().forEach(u ->
-                System.out.println("  " + u));
-
-        // Test ProductDAO
-        System.out.println("\n--- ProductDAO ---");
-        ProductDAO productDAO = new ProductDAO();
-        System.out.println("Nombre de produits : " + productDAO.findAll().size());
-        productDAO.findAll().forEach(p ->
-                System.out.println("  " + p));
-
-        // Test CategoryDAO
-        System.out.println("\n--- CategoryDAO ---");
-        CategoryDAO categoryDAO = new CategoryDAO();
-        System.out.println("Nombre de catégories : " + categoryDAO.findAll().size());
-        categoryDAO.findAll().forEach(c ->
-                System.out.println("  " + c));
-
-        System.out.println("\n==============================");
-        System.out.println("  TESTS TERMINÉS AVEC SUCCÈS  ");
-        System.out.println("==============================");
+        DatabaseManager.getInstance().testConnection();
     }
+
 }
