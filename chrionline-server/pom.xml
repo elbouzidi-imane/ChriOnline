@@ -4,29 +4,47 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
     <groupId>com.chrionline</groupId>
     <artifactId>chrionline</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
+
   <artifactId>chrionline-server</artifactId>
+
   <dependencies>
+
+    <!-- Module common partagé -->
     <dependency>
       <groupId>com.chrionline</groupId>
       <artifactId>chrionline-common</artifactId>
       <version>1.0-SNAPSHOT</version>
     </dependency>
+
+    <!-- PostgreSQL JDBC -->
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
       <version>42.7.1</version>
     </dependency>
+
+    <!-- BCrypt pour hasher les mots de passe -->
     <dependency>
       <groupId>org.mindrot</groupId>
       <artifactId>jbcrypt</artifactId>
       <version>0.4</version>
     </dependency>
+
+    <!-- Gson pour sérialiser les objets en JSON -->
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.10.1</version>
+    </dependency>
+
   </dependencies>
+
   <build>
     <plugins>
       <plugin>
@@ -42,4 +60,5 @@
       </plugin>
     </plugins>
   </build>
+
 </project>
