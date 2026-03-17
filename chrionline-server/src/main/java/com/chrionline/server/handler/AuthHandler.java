@@ -94,5 +94,5 @@ public class AuthHandler {
         // Le client efface simplement ses données locales
         return Message.ok(Protocol.LOGOUT, "Déconnexion réussie");
     }
-    
+
 }
