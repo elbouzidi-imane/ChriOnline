@@ -1,7 +1,96 @@
 package com.chrionline.client.ui.views;
+
+import com.chrionline.client.service.AuthService;
+import com.chrionline.client.session.AppSession;
+import com.chrionline.client.ui.NavigationManager;
+import com.chrionline.client.util.UIUtils;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-public class LoginView extends VBox {
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
+
+public class LoginView extends HBox {
+    private final AuthService authService = new AuthService();
+
     public LoginView() {
-        // TODO : construire la vue Login
+        setSpacing(0);
+        setStyle("-fx-background-color: linear-gradient(to right, #144d43, #d97706);");
+
+        VBox marketing = new VBox(16);
+        marketing.setPadding(new Insets(48));
+        marketing.setAlignment(Pos.CENTER_LEFT);
+        marketing.setPrefWidth(390);
+
+        Label brand = new Label("ChriOnline");
+        brand.setStyle("-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: white;");
+        Label headline = new Label("La vitrine mode qui donne envie d'acheter.");
+        headline.setWrapText(true);
+        headline.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #fff7ed;");
+        Label text = new Label("Connectez-vous pour parcourir les tenues, filtrer les categories et commander en quelques clics.");
+        text.setWrapText(true);
+        text.setStyle("-fx-font-size: 14px; -fx-text-fill: #fde7cf;");
+
+        StackPane art = new StackPane();
+        Rectangle card = new Rectangle(220, 220);
+        card.setArcWidth(36);
+        card.setArcHeight(36);
+        card.setFill(Color.rgb(255, 255, 255, 0.18));
+        Circle circle = new Circle(58, Color.rgb(255, 216, 181, 0.85));
+        art.getChildren().addAll(card, circle);
+
+        marketing.getChildren().addAll(brand, headline, text, art);
+
+        VBox form = new VBox(16);
+        form.setPadding(new Insets(42));
+        form.setAlignment(Pos.CENTER);
+        form.setStyle("-fx-background-color: #fffaf5;");
+        HBox.setHgrow(form, Priority.ALWAYS);
+
+        Label title = new Label("Connexion");
+        title.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #162521;");
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email");
+        emailField.setMaxWidth(340);
+        emailField.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
+
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Mot de passe");
+        passwordField.setMaxWidth(340);
+        passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
+
+        Button loginButton = ViewFactory.createPrimaryButton("Se connecter");
+        loginButton.setDefaultButton(true);
+        loginButton.setOnAction(event -> {
+            try {
+                var user = authService.login(emailField.getText().trim(), passwordField.getText());
+                AppSession.setCurrentUser(user);
+                if (user.isAdmin()) {
+                    NavigationManager.navigateTo(new AdminView());
+                } else {
+                    NavigationManager.navigateTo(new ProductListView());
+                }
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
+        });
+
+        Hyperlink registerLink = new Hyperlink("Creer un compte");
+        registerLink.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
+        Hyperlink homeLink = new Hyperlink("Retour a l'accueil");
+        homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
+
+        form.getChildren().addAll(title, emailField, passwordField, loginButton, registerLink, homeLink);
+        getChildren().addAll(marketing, form);
     }
 }
