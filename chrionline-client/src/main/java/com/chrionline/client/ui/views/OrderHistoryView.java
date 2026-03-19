@@ -6,6 +6,7 @@ import com.chrionline.client.model.ProductDTO;
 import com.chrionline.client.service.OrderService;
 import com.chrionline.client.service.ProductService;
 import com.chrionline.client.ui.NavigationManager;
+import com.chrionline.client.util.PriceUtils;
 import com.chrionline.client.util.UIUtils;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -61,7 +62,7 @@ public class OrderHistoryView extends VBox {
         statusCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getStatut()));
 
         TableColumn<OrderDTO, String> totalCol = new TableColumn<>("Total");
-        totalCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(String.format("%.2f EUR", data.getValue().getMontantTotal())));
+        totalCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(PriceUtils.formatMad(data.getValue().getMontantTotal())));
 
         TableColumn<OrderDTO, OrderDTO> actionCol = new TableColumn<>("Action");
         actionCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue()));
@@ -119,7 +120,7 @@ public class OrderHistoryView extends VBox {
 
             Label meta = new Label(
                     "Statut : " + detailedOrder.getStatut()
-                            + "   |   Total : " + String.format("%.2f EUR", detailedOrder.getMontantTotal())
+                            + "   |   Total : " + PriceUtils.formatMad(detailedOrder.getMontantTotal())
             );
             meta.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");
 
@@ -149,8 +150,8 @@ public class OrderHistoryView extends VBox {
                     Label details = new Label(
                             "Taille #" + line.getTailleId()
                                     + "   |   Quantite : " + line.getQuantite()
-                                    + "   |   Prix unitaire : " + String.format("%.2f EUR", line.getPrixUnitaire())
-                                    + "   |   Sous-total : " + String.format("%.2f EUR", line.getSousTotal())
+                                    + "   |   Prix unitaire : " + PriceUtils.formatMad(line.getPrixUnitaire())
+                                    + "   |   Sous-total : " + PriceUtils.formatMad(line.getSousTotal())
                     );
                     details.setWrapText(true);
                     details.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");

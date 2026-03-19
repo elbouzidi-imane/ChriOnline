@@ -87,10 +87,16 @@ public class LoginView extends HBox {
 
         Hyperlink registerLink = new Hyperlink("Creer un compte");
         registerLink.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
+        Hyperlink catalogLink = new Hyperlink("Voir le catalogue sans connexion");
+        catalogLink.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
+        Hyperlink forgotLink = new Hyperlink("Mot de passe oublie ?");
+        forgotLink.setOnAction(event -> UIUtils.showInfo(
+                "La reinitialisation du mot de passe n'est pas encore disponible dans le protocole serveur actuel."
+        ));
         Hyperlink homeLink = new Hyperlink("Retour a l'accueil");
         homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
 
-        form.getChildren().addAll(title, emailField, passwordField, loginButton, registerLink, homeLink);
+        form.getChildren().addAll(title, emailField, passwordField, loginButton, registerLink, catalogLink, forgotLink, homeLink);
         getChildren().addAll(marketing, form);
     }
 }

@@ -12,6 +12,7 @@ import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public class RegisterView extends HBox {
@@ -49,19 +50,26 @@ public class RegisterView extends HBox {
         TextField nomField = createField("Nom");
         TextField prenomField = createField("Prenom");
         TextField emailField = createField("Email");
-        PasswordField passwordField = new PasswordField();
-        passwordField.setPromptText("Mot de passe");
-        passwordField.setMaxWidth(380);
-        passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
+
+        PasswordToggleControl passwordControl = new PasswordToggleControl("Mot de passe");
+        PasswordToggleControl confirmControl = new PasswordToggleControl("Confirmer le mot de passe");
+
         TextField telField = createField("Telephone");
         TextField adresseField = createField("Adresse");
 
         Button registerButton = ViewFactory.createPrimaryButton("S'inscrire");
         registerButton.setOnAction(event -> {
             String email = emailField.getText().trim();
+            String password = passwordControl.getValue();
+            String confirmation = confirmControl.getValue();
+
             if (nomField.getText().isBlank() || prenomField.getText().isBlank()
-                    || email.isBlank() || passwordField.getText().isBlank()) {
+                    || email.isBlank() || password.isBlank() || confirmation.isBlank()) {
                 UIUtils.showError("Tous les champs obligatoires doivent etre remplis.");
+                return;
+            }
+            if (!password.equals(confirmation)) {
+                UIUtils.showError("La confirmation du mot de passe ne correspond pas.");
                 return;
             }
             if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
@@ -73,11 +81,11 @@ public class RegisterView extends HBox {
                         nomField.getText().trim(),
                         prenomField.getText().trim(),
                         email,
-                        passwordField.getText(),
+                        password,
                         telField.getText().trim(),
                         adresseField.getText().trim()
                 );
-                UIUtils.showInfo("Inscription reussie. Connectez-vous.");
+                UIUtils.showSuccess("Inscription reussie. Connectez-vous.");
                 NavigationManager.navigateTo(new LoginView());
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
@@ -89,7 +97,11 @@ public class RegisterView extends HBox {
         Hyperlink homeLink = new Hyperlink("Retour a l'accueil");
         homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
 
-        form.getChildren().addAll(title, nomField, prenomField, emailField, passwordField, telField, adresseField, registerButton, backLink, homeLink);
+        form.getChildren().addAll(
+                title, nomField, prenomField, emailField,
+                passwordControl, confirmControl,
+                telField, adresseField, registerButton, backLink, homeLink
+        );
         getChildren().addAll(intro, form);
     }
 
@@ -99,5 +111,54 @@ public class RegisterView extends HBox {
         field.setMaxWidth(380);
         field.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
         return field;
+    }
+
+    private static final class PasswordToggleControl extends StackPane {
+        private final PasswordField passwordField = new PasswordField();
+        private final TextField visibleField = new TextField();
+
+        private PasswordToggleControl(String prompt) {
+            passwordField.setPromptText(prompt);
+            visibleField.setPromptText(prompt);
+            passwordField.setMaxWidth(380);
+            visibleField.setMaxWidth(380);
+            passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
+            visibleField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
+            visibleField.setManaged(false);
+            visibleField.setVisible(false);
+
+            Button eyeButton = ViewFactory.createSecondaryButton("\uD83D\uDC41");
+            eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                    + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            eyeButton.setOnAction(event -> toggleVisibility(eyeButton));
+
+            StackPane.setAlignment(eyeButton, Pos.CENTER_RIGHT);
+            StackPane.setMargin(eyeButton, new Insets(0, 8, 0, 0));
+            getChildren().addAll(passwordField, visibleField, eyeButton);
+        }
+
+        private void toggleVisibility(Button eyeButton) {
+            if (visibleField.isVisible()) {
+                passwordField.setText(visibleField.getText());
+                visibleField.setVisible(false);
+                visibleField.setManaged(false);
+                passwordField.setVisible(true);
+                passwordField.setManaged(true);
+                eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            } else {
+                visibleField.setText(passwordField.getText());
+                passwordField.setVisible(false);
+                passwordField.setManaged(false);
+                visibleField.setVisible(true);
+                visibleField.setManaged(true);
+                eyeButton.setStyle("-fx-background-color: #daf1e9; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            }
+        }
+
+        private String getValue() {
+            return visibleField.isVisible() ? visibleField.getText() : passwordField.getText();
+        }
     }
 }
