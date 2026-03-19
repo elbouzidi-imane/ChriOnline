@@ -8,9 +8,10 @@ public class Protocol {
     public static final String LOGOUT   = "LOGOUT";
 
     // ── Produits ──────────────────────────────────────
-    public static final String GET_PRODUCTS   = "GET_PRODUCTS";
-    public static final String GET_PRODUCT    = "GET_PRODUCT";
-    public static final String GET_CATEGORIES = "GET_CATEGORIES";
+    public static final String GET_PRODUCTS              = "GET_PRODUCTS";
+    public static final String GET_PRODUCT               = "GET_PRODUCT";
+    public static final String GET_CATEGORIES            = "GET_CATEGORIES";
+    public static final String GET_PRODUCTS_BY_CATEGORIE = "GET_PRODUCTS_BY_CATEGORIE";
 
     // ── Panier ────────────────────────────────────────
     public static final String GET_CART         = "GET_CART";
@@ -27,15 +28,38 @@ public class Protocol {
     // ── Paiement ──────────────────────────────────────
     public static final String PAY = "PAY";
 
-    // ── Admin ─────────────────────────────────────────
+    // ── Admin — Produits ──────────────────────────────
     public static final String ADMIN_ADD_PRODUCT    = "ADMIN_ADD_PRODUCT";
     public static final String ADMIN_UPDATE_PRODUCT = "ADMIN_UPDATE_PRODUCT";
     public static final String ADMIN_DELETE_PRODUCT = "ADMIN_DELETE_PRODUCT";
-    public static final String ADMIN_GET_USERS      = "ADMIN_GET_USERS";
-    public static final String ADMIN_GET_ORDERS     = "ADMIN_GET_ORDERS";
-    public static final String ADMIN_UPDATE_STOCK   = "ADMIN_UPDATE_STOCK";
-    public static final String ADMIN_SUSPEND_USER   = "ADMIN_SUSPEND_USER";
-    public static final String ADMIN_ACTIVATE_USER  = "ADMIN_ACTIVATE_USER";
+
+    // ── Admin — Tailles produit ───────────────────────
+    public static final String ADMIN_ADD_SIZE    = "ADMIN_ADD_SIZE";
+    public static final String ADMIN_DELETE_SIZE = "ADMIN_DELETE_SIZE";
+    public static final String ADMIN_GET_SIZES   = "ADMIN_GET_SIZES";
+
+    // ── Admin — Guide taille ──────────────────────────
+    public static final String ADMIN_ADD_GUIDE    = "ADMIN_ADD_GUIDE";
+    public static final String ADMIN_DELETE_GUIDE = "ADMIN_DELETE_GUIDE";
+    public static final String ADMIN_GET_GUIDE    = "ADMIN_GET_GUIDE";
+
+    // ── Admin — Stock ─────────────────────────────────
+    public static final String ADMIN_UPDATE_STOCK = "ADMIN_UPDATE_STOCK";
+
+    // ── Admin — Utilisateurs ──────────────────────────
+    public static final String ADMIN_GET_USERS     = "ADMIN_GET_USERS";
+    public static final String ADMIN_SUSPEND_USER  = "ADMIN_SUSPEND_USER";
+    public static final String ADMIN_ACTIVATE_USER = "ADMIN_ACTIVATE_USER";
+    public static final String ADMIN_UPDATE_USER   = "ADMIN_UPDATE_USER";
+
+    // ── Admin — Commandes ─────────────────────────────
+    public static final String ADMIN_GET_ORDERS          = "ADMIN_GET_ORDERS";
+    public static final String ADMIN_GET_ORDER_DETAIL    = "ADMIN_GET_ORDER_DETAIL";
+    public static final String ADMIN_UPDATE_ORDER_STATUT = "ADMIN_UPDATE_ORDER_STATUT";
+
+    // ── Admin — Paiement ──────────────────────────────
+    public static final String ADMIN_GET_PAYMENT = "ADMIN_GET_PAYMENT";
+    public static final String ADMIN_REMBOURSE   = "ADMIN_REMBOURSE";
 
     // ── Réponses serveur ──────────────────────────────
     public static final String OK    = "OK";

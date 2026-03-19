@@ -60,7 +60,8 @@ public class ClientHandler implements Runnable {
 
             case Protocol.GET_PRODUCTS,
                  Protocol.GET_PRODUCT,
-                 Protocol.GET_CATEGORIES
+                 Protocol.GET_CATEGORIES,
+                 Protocol.GET_PRODUCTS_BY_CATEGORIE
                     -> productHandler.handle(req);
 
             case Protocol.GET_CART,
@@ -78,14 +79,25 @@ public class ClientHandler implements Runnable {
             case Protocol.ADMIN_ADD_PRODUCT,
                  Protocol.ADMIN_UPDATE_PRODUCT,
                  Protocol.ADMIN_DELETE_PRODUCT,
-                 Protocol.ADMIN_GET_USERS,
-                 Protocol.ADMIN_GET_ORDERS,
+                 Protocol.ADMIN_ADD_SIZE,
+                 Protocol.ADMIN_DELETE_SIZE,
+                 Protocol.ADMIN_GET_SIZES,
+                 Protocol.ADMIN_ADD_GUIDE,
+                 Protocol.ADMIN_DELETE_GUIDE,
+                 Protocol.ADMIN_GET_GUIDE,
                  Protocol.ADMIN_UPDATE_STOCK,
+                 Protocol.ADMIN_GET_USERS,
                  Protocol.ADMIN_SUSPEND_USER,
-                 Protocol.ADMIN_ACTIVATE_USER
+                 Protocol.ADMIN_ACTIVATE_USER,
+                 Protocol.ADMIN_UPDATE_USER,
+                 Protocol.ADMIN_GET_ORDERS,
+                 Protocol.ADMIN_GET_ORDER_DETAIL,
+                 Protocol.ADMIN_UPDATE_ORDER_STATUT,
+                 Protocol.ADMIN_GET_PAYMENT,
+                 Protocol.ADMIN_REMBOURSE
                     -> adminHandler.handle(req);
 
-            default -> Message.error("Type de requête inconnu : " + req.getType());
+            default -> Message.error("Type inconnu : " + req.getType());
         };
     }
 }

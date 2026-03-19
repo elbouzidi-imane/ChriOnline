@@ -19,6 +19,7 @@ public class ProductHandler {
             case Protocol.GET_PRODUCTS   -> handleGetProducts(request);
             case Protocol.GET_PRODUCT    -> handleGetProduct(request);
             case Protocol.GET_CATEGORIES -> handleGetCategories(request);
+            case Protocol.GET_PRODUCTS_BY_CATEGORIE -> handleGetProductsByCategorie(request);
             default -> Message.error("Type non géré par ProductHandler");
         };
     }
@@ -64,6 +65,16 @@ public class ProductHandler {
         List<Category> categories = productService.getAllCategories();
         String json = gson.toJson(categories);
         return Message.ok(Protocol.GET_CATEGORIES, json);
+    }
+    // payload : "categorieId"
+    private Message handleGetProductsByCategorie(Message req) {
+        try {
+            int categorieId = Integer.parseInt(req.getPayload().trim());
+            List<Product> products = productService.getProductsByCategorie(categorieId);
+            return Message.ok(Protocol.GET_PRODUCTS_BY_CATEGORIE, gson.toJson(products));
+        } catch (Exception e) {
+            return Message.error("Erreur filtrage : " + e.getMessage());
+        }
     }
 
 }
