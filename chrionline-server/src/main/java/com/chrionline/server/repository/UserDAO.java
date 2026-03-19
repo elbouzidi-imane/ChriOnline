@@ -147,6 +147,32 @@ public class UserDAO {
         }
         return false;
     }
+    // ── Mettre à jour date_naissance ──────────────────
+    public boolean updateDateNaissance(int id, java.sql.Date dateNaissance) {
+        String sql = "UPDATE utilisateur SET date_naissance=? WHERE id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, dateNaissance);
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("UserDAO.updateDateNaissance : " + e.getMessage());
+            return false;
+        }
+    }
+
+    // ── Supprimer définitivement un compte ────────────
+    public boolean delete(int id) {
+        String sql = "DELETE FROM utilisateur WHERE id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("UserDAO.delete : " + e.getMessage());
+            return false;
+        }
+    }
 
     // ── Mapper un ResultSet → User ────────────────────
     private User mapRow(ResultSet rs) throws SQLException {
@@ -161,6 +187,7 @@ public class UserDAO {
         u.setRole(rs.getString("role"));
         u.setStatut(rs.getString("statut"));
         u.setDateInscription(rs.getDate("date_inscription"));
+        u.setDateNaissance(rs.getDate("date_naissance"));
         return u;
     }
 }

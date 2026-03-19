@@ -96,6 +96,15 @@ public class ClientHandler implements Runnable {
                  Protocol.ADMIN_GET_PAYMENT,
                  Protocol.ADMIN_REMBOURSE
                     -> adminHandler.handle(req);
+            case Protocol.VERIFY_EMAIL,
+                 Protocol.RESEND_OTP,
+                 Protocol.FORGOT_PASSWORD,
+                 Protocol.VERIFY_RESET_OTP,
+                 Protocol.RESET_PASSWORD,
+                 Protocol.UPDATE_PROFILE,
+                 Protocol.DEACTIVATE_ACCOUNT,
+                 Protocol.DELETE_ACCOUNT
+                    -> authHandler.handle(req);
 
             default -> Message.error("Type inconnu : " + req.getType());
         };

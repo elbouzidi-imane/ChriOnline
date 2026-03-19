@@ -360,5 +360,5 @@ public class AdminHandler {
             return Message.error("Erreur : " + e.getMessage());
         }
     }
-    
+
 }

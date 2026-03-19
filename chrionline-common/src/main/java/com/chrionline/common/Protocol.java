@@ -6,7 +6,15 @@ public class Protocol {
     public static final String LOGIN    = "LOGIN";
     public static final String REGISTER = "REGISTER";
     public static final String LOGOUT   = "LOGOUT";
-
+    // ── Authentification avancée ──────────────────────
+    public static final String VERIFY_EMAIL       = "VERIFY_EMAIL";
+    public static final String RESEND_OTP         = "RESEND_OTP";
+    public static final String FORGOT_PASSWORD    = "FORGOT_PASSWORD";
+    public static final String VERIFY_RESET_OTP   = "VERIFY_RESET_OTP";
+    public static final String RESET_PASSWORD     = "RESET_PASSWORD";
+    public static final String UPDATE_PROFILE     = "UPDATE_PROFILE";
+    public static final String DEACTIVATE_ACCOUNT = "DEACTIVATE_ACCOUNT";
+    public static final String DELETE_ACCOUNT     = "DELETE_ACCOUNT";
     // ── Produits ──────────────────────────────────────
     public static final String GET_PRODUCTS              = "GET_PRODUCTS";
     public static final String GET_PRODUCT               = "GET_PRODUCT";
