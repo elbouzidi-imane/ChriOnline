@@ -64,16 +64,20 @@ public class OrderDAO {
     // ── Commandes d'un utilisateur ────────────────────
     public List<Order> findByUser(int userId) {
         String sql = """
-            SELECT * FROM commande
-            WHERE utilisateur_id = ?
-            ORDER BY date_commande DESC
-            """;
+        SELECT * FROM commande
+        WHERE utilisateur_id = ?
+        ORDER BY date_commande DESC
+        """;
         List<Order> orders = new ArrayList<>();
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
-            while (rs.next()) orders.add(mapRow(rs));
+            while (rs.next()) {
+                Order o = mapRow(rs);
+                o.setLignes(findLines(o.getId())); // ← ajouter cette ligne
+                orders.add(o);
+            }
         } catch (Exception e) {
             System.err.println("OrderDAO.findByUser : " + e.getMessage());
         }
@@ -105,7 +109,11 @@ public class OrderDAO {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ResultSet rs = ps.executeQuery();
-            while (rs.next()) orders.add(mapRow(rs));
+            while (rs.next()) {
+                Order o = mapRow(rs);
+                o.setLignes(findLines(o.getId())); // ← ajouter cette ligne
+                orders.add(o);
+            }
         } catch (Exception e) {
             System.err.println("OrderDAO.findAll : " + e.getMessage());
         }
