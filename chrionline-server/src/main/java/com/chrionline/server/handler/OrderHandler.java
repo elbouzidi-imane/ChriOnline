@@ -18,6 +18,7 @@ public class OrderHandler {
             case Protocol.PLACE_ORDER -> handlePlaceOrder(request);
             case Protocol.GET_ORDERS  -> handleGetOrders(request);
             case Protocol.GET_ORDER   -> handleGetOrder(request);
+            case Protocol.PAY -> handlePay(request);
             default -> Message.error("Type non géré par OrderHandler");
         };
     }
@@ -80,6 +81,21 @@ public class OrderHandler {
             return Message.ok(Protocol.GET_ORDER, gson.toJson(order));
         } catch (Exception e) {
             return Message.error("Erreur récupération commande : " + e.getMessage());
+        }
+    }
+    // payload : "userId|modePaiement|montant"
+    private Message handlePay(Message req) {
+        try {
+            String[] parts = req.getPayload().split("\\|", -1);
+            if (parts.length < 3) return Message.error("Format invalide");
+            int    userId       = Integer.parseInt(parts[0].trim());
+            String modePaiement = parts[1].trim();
+            double montant      = Double.parseDouble(parts[2].trim());
+            // Paiement simulé — toujours accepté
+            return Message.ok(Protocol.PAY,
+                    "Paiement de " + montant + " € accepté via " + modePaiement);
+        } catch (Exception e) {
+            return Message.error("Erreur paiement : " + e.getMessage());
         }
     }
 

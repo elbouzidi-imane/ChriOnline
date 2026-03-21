@@ -3,7 +3,11 @@ package com.chrionline.server.handler;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.Category;
+import com.chrionline.server.model.GuideTaille;
 import com.chrionline.server.model.Product;
+import com.chrionline.server.model.ProductSize;
+import com.chrionline.server.repository.GuideDAO;
+import com.chrionline.server.repository.SizeDAO;
 import com.chrionline.server.service.ProductService;
 import com.google.gson.Gson;
 
@@ -12,13 +16,15 @@ import java.util.List;
 public class ProductHandler {
 
     private final ProductService productService = new ProductService();
-    private final Gson gson = new Gson();
+    private final GuideDAO       guideDAO       = new GuideDAO();
+    private final SizeDAO        sizeDAO        = new SizeDAO();
+    private final Gson           gson           = new Gson();
 
     public Message handle(Message request) {
         return switch (request.getType()) {
-            case Protocol.GET_PRODUCTS   -> handleGetProducts(request);
-            case Protocol.GET_PRODUCT    -> handleGetProduct(request);
-            case Protocol.GET_CATEGORIES -> handleGetCategories(request);
+            case Protocol.GET_PRODUCTS              -> handleGetProducts(request);
+            case Protocol.GET_PRODUCT               -> handleGetProduct(request);
+            case Protocol.GET_CATEGORIES            -> handleGetCategories(request);
             case Protocol.GET_PRODUCTS_BY_CATEGORIE -> handleGetProductsByCategorie(request);
             default -> Message.error("Type non géré par ProductHandler");
         };
@@ -27,10 +33,7 @@ public class ProductHandler {
     // ── GET_PRODUCTS ──────────────────────────────────
     private Message handleGetProducts(Message req) {
         String payload = req.getPayload();
-
         List<Product> products;
-
-        // Si payload contient un id de catégorie → filtrer
         if (payload != null && !payload.isEmpty()) {
             try {
                 int categorieId = Integer.parseInt(payload.trim());
@@ -41,19 +44,22 @@ public class ProductHandler {
         } else {
             products = productService.getAllProducts();
         }
-
-        String json = gson.toJson(products);
-        return Message.ok(Protocol.GET_PRODUCTS, json);
+        return Message.ok(Protocol.GET_PRODUCTS, gson.toJson(products));
     }
 
-    // ── GET_PRODUCT ───────────────────────────────────
+    // ── GET_PRODUCT (avec tailles + guides) ───────────
     private Message handleGetProduct(Message req) {
         try {
             int id = Integer.parseInt(req.getPayload().trim());
             Product product = productService.getProductById(id);
-            if (product == null) {
-                return Message.error("Produit introuvable");
-            }
+            if (product == null) return Message.error("Produit introuvable");
+
+            // Enrichir avec tailles et guides
+            List<ProductSize> sizes  = sizeDAO.findByProduit(id);
+            List<GuideTaille> guides = guideDAO.findByProduit(id);
+            product.setTailles(sizes);
+            product.setGuides(guides);
+
             return Message.ok(Protocol.GET_PRODUCT, gson.toJson(product));
         } catch (Exception e) {
             return Message.error("ID produit invalide");
@@ -63,10 +69,10 @@ public class ProductHandler {
     // ── GET_CATEGORIES ────────────────────────────────
     private Message handleGetCategories(Message req) {
         List<Category> categories = productService.getAllCategories();
-        String json = gson.toJson(categories);
-        return Message.ok(Protocol.GET_CATEGORIES, json);
+        return Message.ok(Protocol.GET_CATEGORIES, gson.toJson(categories));
     }
-    // payload : "categorieId"
+
+    // ── GET_PRODUCTS_BY_CATEGORIE ─────────────────────
     private Message handleGetProductsByCategorie(Message req) {
         try {
             int categorieId = Integer.parseInt(req.getPayload().trim());
@@ -76,5 +82,4 @@ public class ProductHandler {
             return Message.error("Erreur filtrage : " + e.getMessage());
         }
     }
-
 }

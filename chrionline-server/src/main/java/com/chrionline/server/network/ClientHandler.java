@@ -73,7 +73,8 @@ public class ClientHandler implements Runnable {
 
             case Protocol.PLACE_ORDER,
                  Protocol.GET_ORDERS,
-                 Protocol.GET_ORDER
+                 Protocol.GET_ORDER,
+                         Protocol.PAY
                     -> orderHandler.handle(req);
 
             case Protocol.ADMIN_ADD_PRODUCT,

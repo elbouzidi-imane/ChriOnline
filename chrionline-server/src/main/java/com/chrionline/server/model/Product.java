@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import com.chrionline.server.model.GuideTaille;
 
 public class Product implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -23,6 +24,7 @@ public class Product implements Serializable {
     private String       imageUrl;
     private Category     categorie;
     private List<ProductSize> tailles = new ArrayList<>();
+    private List<GuideTaille> guides = new ArrayList<>();
 
     public Product() {}
 
@@ -55,6 +57,8 @@ public class Product implements Serializable {
     public String    getImageUrl()      { return imageUrl; }
     public Category  getCategorie()     { return categorie; }
     public List<ProductSize> getTailles(){ return tailles; }
+    public List<GuideTaille> getGuides()              { return guides; }
+
 
     // ── Setters ───────────────────────────────────────
     public void setId(int id)                        { this.id = id; }
@@ -72,7 +76,7 @@ public class Product implements Serializable {
     public void setImageUrl(String url)              { this.imageUrl = url; }
     public void setCategorie(Category cat)           { this.categorie = cat; }
     public void setTailles(List<ProductSize> t)      { this.tailles = t; }
-
+    public void setGuides(List<GuideTaille> guides)   { this.guides = guides; }
     // ── Méthodes métier ───────────────────────────────
 
     /** Prix à afficher : prix réduit si dispo, sinon prix original */
