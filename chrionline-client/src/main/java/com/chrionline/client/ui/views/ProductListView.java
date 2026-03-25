@@ -62,6 +62,9 @@ public class ProductListView extends VBox {
 
         HBox toolbar;
         if (AppSession.isLoggedIn()) {
+            Button profileButton = createHeaderButton("Mon profil");
+            profileButton.setOnAction(event -> NavigationManager.navigateTo(new ProfileView()));
+
             Button historyButton = createHeaderButton("Mes commandes");
             historyButton.setOnAction(event -> NavigationManager.navigateTo(new OrderHistoryView()));
 
@@ -74,7 +77,7 @@ public class ProductListView extends VBox {
                 NavigationManager.navigateTo(new HomeView());
             });
 
-            toolbar = ViewFactory.createTopBar(categoryBox, homeButton, historyButton, cartButton, logoutButton);
+            toolbar = ViewFactory.createTopBar(categoryBox, homeButton, profileButton, historyButton, cartButton, logoutButton);
         } else {
             Button loginButton = createHeaderButton("Se connecter");
             loginButton.setOnAction(event -> NavigationManager.navigateTo(new LoginView()));
@@ -174,7 +177,14 @@ public class ProductListView extends VBox {
 
         categoryBox.setOnAction(event -> {
             CategoryDTO selected = categoryBox.getSelectionModel().getSelectedItem();
-            listView.setItems(FXCollections.observableArrayList(filterProducts(selected)));
+            try {
+                List<ProductDTO> products = selected == null || selected.getId() == -1
+                        ? allProducts
+                        : productService.getByCategory(selected.getId());
+                listView.setItems(FXCollections.observableArrayList(products));
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
         });
 
         try {

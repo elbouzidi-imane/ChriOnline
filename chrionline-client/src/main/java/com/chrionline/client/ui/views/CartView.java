@@ -2,30 +2,41 @@ package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.CartDTO;
 import com.chrionline.client.model.CartLineDTO;
+import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.service.CartService;
+import com.chrionline.client.service.ProductService;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.PriceUtils;
 import com.chrionline.client.util.UIUtils;
-import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class CartView extends ScrollPane {
     private final CartService cartService = new CartService();
-    private final TableView<CartLineDTO> table = new TableView<>();
+    private final ProductService productService = new ProductService();
+    private final Map<Integer, ProductDTO> productCache = new HashMap<>();
+    private final Map<Integer, String> sizeLabelCache = new HashMap<>();
+
+    private final ListView<CartLineDTO> cartList = new ListView<>();
     private final Label totalLabel = new Label();
     private final Label countLabel = new Label();
     private final Label emptyLabel = new Label("Votre panier est vide");
@@ -45,7 +56,8 @@ public class CartView extends ScrollPane {
         Label title = new Label("Votre panier");
         title.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
 
-        Label subtitle = new Label("Verifiez vos articles, ajustez les quantites puis passez au paiement.");
+        Label subtitle = new Label("Retrouvez vos articles, modifiez la quantite, supprimez une ligne et voyez le prix se mettre a jour.");
+        subtitle.setWrapText(true);
         subtitle.setStyle("-fx-font-size: 14px; -fx-text-fill: #5b5f63;");
 
         VBox heading = new VBox(8, title, subtitle);
@@ -60,19 +72,13 @@ public class CartView extends ScrollPane {
 
         HBox topActions = new HBox(10, homeButton, continueButton);
 
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
-        table.setStyle("-fx-background-radius: 18; -fx-border-radius: 18;");
-        table.setPrefHeight(360);
+        countLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #5b5f63;");
+        emptyLabel.setVisible(false);
+        emptyLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #991b1b;");
 
-        TableColumn<CartLineDTO, String> productCol = new TableColumn<>("Produit");
-        productCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getProduit().getNom()));
-
-        TableColumn<CartLineDTO, String> sizeCol = new TableColumn<>("Taille");
-        sizeCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getTaille().getValeur()));
-
-        TableColumn<CartLineDTO, CartLineDTO> qtyCol = new TableColumn<>("Quantite");
-        qtyCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue()));
-        qtyCol.setCellFactory(ignored -> new TableCell<>() {
+        cartList.setPrefHeight(420);
+        cartList.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent;");
+        cartList.setCellFactory(ignored -> new ListCell<>() {
             @Override
             protected void updateItem(CartLineDTO item, boolean empty) {
                 super.updateItem(item, empty);
@@ -80,6 +86,22 @@ public class CartView extends ScrollPane {
                     setGraphic(null);
                     return;
                 }
+
+                Label productName = new Label(resolveProductName(item));
+                productName.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+                Label sizeLabel = new Label("Taille : " + resolveSizeLabel(item));
+                sizeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
+
+                Label colorLabel = new Label("Couleur : " + resolveColor(item));
+                colorLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
+
+                Label unitPrice = new Label("Prix unitaire : " + PriceUtils.formatMad(item.getPrixUnitaire()));
+                unitPrice.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
+
+                Label subtotal = new Label("Sous-total : " + PriceUtils.formatMad(item.getSousTotal()));
+                subtotal.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+
                 Spinner<Integer> spinner = new Spinner<>(1, 99, item.getQuantite());
                 spinner.setEditable(true);
                 spinner.setPrefWidth(90);
@@ -94,49 +116,41 @@ public class CartView extends ScrollPane {
                         UIUtils.showError(e.getMessage());
                     }
                 });
-                setGraphic(spinner);
-            }
-        });
 
-        TableColumn<CartLineDTO, String> unitPriceCol = new TableColumn<>("Prix");
-        unitPriceCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(PriceUtils.formatMad(data.getValue().getPrixUnitaire())));
+                VBox qtyBox = new VBox(6,
+                        new Label("Quantite"),
+                        spinner
+                );
 
-        TableColumn<CartLineDTO, String> subtotalCol = new TableColumn<>("Sous-total");
-        subtotalCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(PriceUtils.formatMad(data.getValue().getSousTotal())));
-
-        TableColumn<CartLineDTO, CartLineDTO> actionCol = new TableColumn<>("Action");
-        actionCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue()));
-        actionCol.setCellFactory(ignored -> new TableCell<>() {
-            private final Button removeButton = ViewFactory.createSecondaryButton("Retirer");
-
-            {
+                Button removeButton = ViewFactory.createSecondaryButton("Supprimer");
                 removeButton.setOnAction(event -> {
-                    CartLineDTO line = getItem();
-                    if (line == null) {
-                        return;
-                    }
                     try {
-                        refresh(cartService.removeFromCart(line.getId()));
+                        refresh(cartService.removeFromCart(item.getId()));
+                        UIUtils.showSuccess("Ligne supprimee du panier.");
                     } catch (Exception e) {
                         UIUtils.showError(e.getMessage());
                     }
                 });
-            }
 
-            @Override
-            protected void updateItem(CartLineDTO item, boolean empty) {
-                super.updateItem(item, empty);
-                setGraphic(empty || item == null ? null : removeButton);
+                VBox left = new VBox(8, productName, sizeLabel, colorLabel, unitPrice, subtotal);
+                left.setAlignment(Pos.CENTER_LEFT);
+
+                Region spacer = new Region();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                HBox actions = new HBox(12, qtyBox, removeButton);
+                actions.setAlignment(Pos.CENTER_RIGHT);
+
+                HBox row = new HBox(16, createProductThumb(resolveProduct(item)), left, spacer, actions);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.setPadding(new Insets(16));
+                row.setStyle("-fx-background-color: rgba(255,255,255,0.94); -fx-background-radius: 22;");
+
+                setGraphic(row);
             }
         });
 
-        table.getColumns().setAll(productCol, sizeCol, qtyCol, unitPriceCol, subtotalCol, actionCol);
-
-        countLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #5b5f63;");
-        emptyLabel.setVisible(false);
-        emptyLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #991b1b;");
-
-        VBox cartCard = new VBox(14, countLabel, table, emptyLabel);
+        VBox cartCard = new VBox(14, countLabel, cartList, emptyLabel);
         cartCard.setPadding(new Insets(18));
         cartCard.setStyle(ViewFactory.cardStyle());
         HBox.setHgrow(cartCard, Priority.ALWAYS);
@@ -144,20 +158,20 @@ public class CartView extends ScrollPane {
         Label summaryTitle = new Label("Resume");
         summaryTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
 
-        Label summaryText = new Label("Tous vos articles sont prets pour la validation.");
+        Label summaryText = new Label("Le total est mis a jour automatiquement apres chaque modification.");
         summaryText.setWrapText(true);
         summaryText.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
         totalLabel.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
 
-        Label paymentHint = new Label("Paiement simule disponible par carte, PayPal ou mode fictif.");
+        Label paymentHint = new Label("Vous pouvez supprimer une ligne puis retourner au catalogue pour ajouter un nouveau produit.");
         paymentHint.setWrapText(true);
         paymentHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #52606d; "
                 + "-fx-background-color: rgba(245,250,248,0.92); -fx-background-radius: 14; -fx-padding: 10;");
 
         VBox summaryCard = new VBox(12, summaryTitle, summaryText, totalLabel, paymentHint, checkoutButton);
         summaryCard.setPadding(new Insets(18));
-        summaryCard.setPrefWidth(260);
+        summaryCard.setPrefWidth(280);
         summaryCard.setStyle(ViewFactory.cardStyle());
 
         HBox body = new HBox(18, cartCard, summaryCard);
@@ -176,10 +190,87 @@ public class CartView extends ScrollPane {
     }
 
     private void refresh(CartDTO cart) {
-        table.setItems(FXCollections.observableArrayList(cart.getLignes()));
+        warmupLineDetails(cart);
+        cartList.setItems(FXCollections.observableArrayList(cart.getLignes()));
         totalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
         countLabel.setText(cart.getLignes().size() + " article(s) dans votre panier");
         emptyLabel.setVisible(cart.isEmpty());
         checkoutButton.setDisable(cart.isEmpty());
+    }
+
+    private void warmupLineDetails(CartDTO cart) {
+        for (CartLineDTO line : cart.getLignes()) {
+            if (!productCache.containsKey(line.getProduitId())) {
+                try {
+                    ProductDTO product = productService.getById(line.getProduitId());
+                    productCache.put(line.getProduitId(), product);
+                    for (ProductSizeDTO size : product.getTailles()) {
+                        sizeLabelCache.put(size.getId(), size.getValeur());
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private String resolveProductName(CartLineDTO line) {
+        if (line.getProduit() != null && line.getProduit().getNom() != null && !line.getProduit().getNom().isBlank()) {
+            return line.getProduit().getNom();
+        }
+        ProductDTO product = productCache.get(line.getProduitId());
+        return product != null && product.getNom() != null ? product.getNom() : "Produit #" + line.getProduitId();
+    }
+
+    private String resolveSizeLabel(CartLineDTO line) {
+        if (line.getTaille() != null && line.getTaille().getValeur() != null && !line.getTaille().getValeur().isBlank()) {
+            return line.getTaille().getValeur();
+        }
+        return sizeLabelCache.getOrDefault(line.getTailleId(), "#" + line.getTailleId());
+    }
+
+    private String resolveColor(CartLineDTO line) {
+        ProductDTO product = resolveProduct(line);
+        return product != null && product.getCouleur() != null && !product.getCouleur().isBlank()
+                ? product.getCouleur()
+                : "-";
+    }
+
+    private ProductDTO resolveProduct(CartLineDTO line) {
+        if (line.getProduit() != null) {
+            return line.getProduit();
+        }
+        return productCache.get(line.getProduitId());
+    }
+
+    private StackPane createProductThumb(ProductDTO product) {
+        StackPane wrapper = new StackPane();
+        wrapper.setPrefSize(96, 112);
+        wrapper.setMinSize(96, 112);
+        wrapper.setMaxSize(96, 112);
+        wrapper.setStyle("-fx-background-color: #fff3df; -fx-background-radius: 18;");
+
+        Rectangle clip = new Rectangle(96, 112);
+        clip.setArcWidth(18);
+        clip.setArcHeight(18);
+
+        if (product != null && product.getImageUrl() != null && !product.getImageUrl().isBlank()) {
+            try {
+                ImageView imageView = new ImageView(new Image(product.getImageUrl(), 96, 112, false, true, true));
+                imageView.setFitWidth(96);
+                imageView.setFitHeight(112);
+                imageView.setPreserveRatio(false);
+                imageView.setClip(clip);
+                wrapper.getChildren().add(imageView);
+                return wrapper;
+            } catch (Exception ignored) {
+            }
+        }
+
+        Label placeholder = new Label(product != null && product.getNom() != null && !product.getNom().isBlank()
+                ? product.getNom().substring(0, 1).toUpperCase()
+                : "C");
+        placeholder.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+        wrapper.getChildren().add(placeholder);
+        return wrapper;
     }
 }

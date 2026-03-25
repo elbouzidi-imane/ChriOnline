@@ -17,6 +17,7 @@ public class ProductDTO {
     private String imageUrl;
     private CategoryDTO categorie;
     private List<ProductSizeDTO> tailles = new ArrayList<>();
+    private List<GuideDTO> guides = new ArrayList<>();
 
     public int getId() {
         return id;
@@ -68,6 +69,10 @@ public class ProductDTO {
 
     public List<ProductSizeDTO> getTailles() {
         return tailles == null ? List.of() : tailles;
+    }
+
+    public List<GuideDTO> getGuides() {
+        return guides == null ? List.of() : guides;
     }
 
     public double getPrixAffiche() {

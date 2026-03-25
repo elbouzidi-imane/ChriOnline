@@ -7,6 +7,9 @@ import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -18,6 +21,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+
+import java.util.Optional;
 
 public class LoginView extends HBox {
     private final AuthService authService = new AuthService();
@@ -33,10 +38,10 @@ public class LoginView extends HBox {
 
         Label brand = new Label("ChriOnline");
         brand.setStyle("-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: white;");
-        Label headline = new Label("La vitrine mode qui donne envie d'acheter.");
+        Label headline = new Label("Connectez-vous ou recuperez l'acces a votre compte.");
         headline.setWrapText(true);
         headline.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #fff7ed;");
-        Label text = new Label("Connectez-vous pour parcourir les tenues, filtrer les categories et commander en quelques clics.");
+        Label text = new Label("Le client supporte maintenant le mot de passe oublie et la verification OTP cote serveur.");
         text.setWrapText(true);
         text.setStyle("-fx-font-size: 14px; -fx-text-fill: #fde7cf;");
 
@@ -90,13 +95,62 @@ public class LoginView extends HBox {
         Hyperlink catalogLink = new Hyperlink("Voir le catalogue sans connexion");
         catalogLink.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
         Hyperlink forgotLink = new Hyperlink("Mot de passe oublie ?");
-        forgotLink.setOnAction(event -> UIUtils.showInfo(
-                "La reinitialisation du mot de passe n'est pas encore disponible dans le protocole serveur actuel."
-        ));
+        forgotLink.setOnAction(event -> showForgotPasswordFlow());
         Hyperlink homeLink = new Hyperlink("Retour a l'accueil");
         homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
 
         form.getChildren().addAll(title, emailField, passwordField, loginButton, registerLink, catalogLink, forgotLink, homeLink);
         getChildren().addAll(marketing, form);
+    }
+
+    private void showForgotPasswordFlow() {
+        Dialog<ButtonType> emailDialog = new Dialog<>();
+        emailDialog.setTitle("Mot de passe oublie");
+        DialogPane pane = emailDialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Votre email");
+        pane.setContent(new VBox(12, new Label("Saisissez votre email pour recevoir un code OTP."), emailField));
+
+        Optional<ButtonType> firstStep = emailDialog.showAndWait();
+        if (firstStep.isEmpty() || firstStep.get() != ButtonType.OK) {
+            return;
+        }
+
+        try {
+            UIUtils.showInfo(authService.forgotPassword(emailField.getText().trim()));
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+            return;
+        }
+
+        Dialog<ButtonType> otpDialog = new Dialog<>();
+        otpDialog.setTitle("Verification OTP");
+        DialogPane otpPane = otpDialog.getDialogPane();
+        otpPane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        otpPane.setStyle("-fx-background-color: #fffaf5;");
+
+        TextField otpField = new TextField();
+        otpField.setPromptText("Code OTP");
+        PasswordField newPasswordField = new PasswordField();
+        newPasswordField.setPromptText("Nouveau mot de passe");
+        otpPane.setContent(new VBox(12,
+                new Label("Entrez le code recu puis choisissez un nouveau mot de passe."),
+                otpField,
+                newPasswordField));
+
+        Optional<ButtonType> secondStep = otpDialog.showAndWait();
+        if (secondStep.isEmpty() || secondStep.get() != ButtonType.OK) {
+            return;
+        }
+
+        try {
+            authService.verifyResetOtp(emailField.getText().trim(), otpField.getText().trim());
+            UIUtils.showSuccess(authService.resetPassword(emailField.getText().trim(), newPasswordField.getText()));
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
     }
 }

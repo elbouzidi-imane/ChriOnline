@@ -6,6 +6,9 @@ import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -14,6 +17,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+
+import java.util.Optional;
 
 public class RegisterView extends HBox {
     private final AuthService authService = new AuthService();
@@ -32,7 +37,7 @@ public class RegisterView extends HBox {
         Label headline = new Label("Creez votre espace client mode.");
         headline.setWrapText(true);
         headline.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #fff7ed;");
-        Label text = new Label("Inscrivez-vous pour suivre vos commandes, gerer votre panier et decouvrir toutes les collections.");
+        Label text = new Label("Inscrivez-vous puis confirmez votre email avec un code OTP envoye par le serveur.");
         text.setWrapText(true);
         text.setStyle("-fx-font-size: 14px; -fx-text-fill: #dff5ef;");
 
@@ -50,12 +55,11 @@ public class RegisterView extends HBox {
         TextField nomField = createField("Nom");
         TextField prenomField = createField("Prenom");
         TextField emailField = createField("Email");
-
         PasswordToggleControl passwordControl = new PasswordToggleControl("Mot de passe");
         PasswordToggleControl confirmControl = new PasswordToggleControl("Confirmer le mot de passe");
-
         TextField telField = createField("Telephone");
         TextField adresseField = createField("Adresse");
+        TextField birthField = createField("Date de naissance (YYYY-MM-DD)");
 
         Button registerButton = ViewFactory.createPrimaryButton("S'inscrire");
         registerButton.setOnAction(event -> {
@@ -77,16 +81,17 @@ public class RegisterView extends HBox {
                 return;
             }
             try {
-                authService.register(
+                String message = authService.register(
                         nomField.getText().trim(),
                         prenomField.getText().trim(),
                         email,
                         password,
                         telField.getText().trim(),
-                        adresseField.getText().trim()
+                        adresseField.getText().trim(),
+                        birthField.getText().trim()
                 );
-                UIUtils.showSuccess("Inscription reussie. Connectez-vous.");
-                NavigationManager.navigateTo(new LoginView());
+                UIUtils.showInfo(message);
+                showEmailVerificationDialog(email);
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
             }
@@ -100,9 +105,42 @@ public class RegisterView extends HBox {
         form.getChildren().addAll(
                 title, nomField, prenomField, emailField,
                 passwordControl, confirmControl,
-                telField, adresseField, registerButton, backLink, homeLink
+                telField, adresseField, birthField,
+                registerButton, backLink, homeLink
         );
         getChildren().addAll(intro, form);
+    }
+
+    private void showEmailVerificationDialog(String email) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Confirmation email");
+        DialogPane pane = dialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        Label info = new Label("Entrez le code OTP envoye a " + email);
+        TextField codeField = createField("Code OTP");
+        Hyperlink resendLink = new Hyperlink("Renvoyer le code");
+        resendLink.setOnAction(event -> {
+            try {
+                UIUtils.showInfo(authService.resendOtp(email, "REGISTER"));
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
+        });
+
+        VBox content = new VBox(12, info, codeField, resendLink);
+        pane.setContent(content);
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                UIUtils.showSuccess(authService.verifyEmail(email, codeField.getText().trim()));
+                NavigationManager.navigateTo(new LoginView());
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
+        }
     }
 
     private TextField createField(String prompt) {

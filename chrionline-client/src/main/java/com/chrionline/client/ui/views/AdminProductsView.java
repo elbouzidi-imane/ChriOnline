@@ -1,5 +1,6 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.GuideDTO;
 import com.chrionline.client.model.ProductDTO;
 import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.service.AdminService;
@@ -48,9 +49,13 @@ public class AdminProductsView extends VBox {
         edit.setOnAction(event -> editProduct());
         Button stock = ViewFactory.createSecondaryButton("Stock par taille");
         stock.setOnAction(event -> updateStock());
+        Button sizes = ViewFactory.createSecondaryButton("Tailles");
+        sizes.setOnAction(event -> manageSizes());
+        Button guides = ViewFactory.createSecondaryButton("Guides");
+        guides.setOnAction(event -> manageGuides());
         Button delete = ViewFactory.createSecondaryButton("Supprimer");
         delete.setOnAction(event -> deleteProduct());
-        headerActions.getChildren().addAll(refresh, add, edit, stock, delete);
+        headerActions.getChildren().addAll(refresh, add, edit, stock, sizes, guides, delete);
 
         Label hint = new Label("Cette page gere uniquement les actions exposees par le serveur admin: fiches produit et stock par taille.");
         hint.setWrapText(true);
@@ -206,6 +211,156 @@ public class AdminProductsView extends VBox {
             adminService.deleteProduct(selected.getId());
             loadProducts();
             UIUtils.showSuccess("Produit supprime avec succes.");
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void manageSizes() {
+        ProductDTO selected = productsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            UIUtils.showError("Selectionnez un produit.");
+            return;
+        }
+        try {
+            List<ProductSizeDTO> sizes = adminService.getSizes(selected.getId());
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle("Gestion des tailles");
+            DialogPane pane = dialog.getDialogPane();
+            pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            pane.setStyle("-fx-background-color: #fffaf5;");
+
+            ComboBox<ProductSizeDTO> sizeBox = new ComboBox<>(FXCollections.observableArrayList(sizes));
+            sizeBox.setCellFactory(ignored -> new ListCell<>() {
+                @Override
+                protected void updateItem(ProductSizeDTO item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getValeur() + " (stock " + item.getStock() + ")");
+                }
+            });
+            sizeBox.setButtonCell(sizeBox.getCellFactory().call(null));
+            if (!sizes.isEmpty()) {
+                sizeBox.getSelectionModel().selectFirst();
+            }
+
+            TextField valueField = new TextField();
+            valueField.setPromptText("Nouvelle taille");
+            TextField stockField = new TextField();
+            stockField.setPromptText("Stock");
+
+            Button addButton = ViewFactory.createPrimaryButton("Ajouter");
+            addButton.setOnAction(event -> {
+                try {
+                    adminService.addSize(selected.getId(), valueField.getText().trim(), Integer.parseInt(stockField.getText().trim()));
+                    UIUtils.showSuccess("Taille ajoutee.");
+                    dialog.close();
+                    loadProducts();
+                } catch (Exception e) {
+                    UIUtils.showError(e.getMessage());
+                }
+            });
+
+            Button deleteButton = ViewFactory.createSecondaryButton("Supprimer la taille selectionnee");
+            deleteButton.setOnAction(event -> {
+                if (sizeBox.getValue() == null) {
+                    UIUtils.showError("Selectionnez une taille.");
+                    return;
+                }
+                try {
+                    adminService.deleteSize(sizeBox.getValue().getId());
+                    UIUtils.showSuccess("Taille supprimee.");
+                    dialog.close();
+                    loadProducts();
+                } catch (Exception e) {
+                    UIUtils.showError(e.getMessage());
+                }
+            });
+
+            VBox content = new VBox(12,
+                    new Label("Tailles existantes"),
+                    sizeBox,
+                    new Label("Ajouter une nouvelle taille"),
+                    valueField,
+                    stockField,
+                    new HBox(10, addButton, deleteButton));
+            pane.setContent(content);
+            dialog.showAndWait();
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void manageGuides() {
+        ProductDTO selected = productsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            UIUtils.showError("Selectionnez un produit.");
+            return;
+        }
+        try {
+            List<GuideDTO> guides = adminService.getGuides(selected.getId());
+            Dialog<ButtonType> dialog = new Dialog<>();
+            dialog.setTitle("Gestion des guides");
+            DialogPane pane = dialog.getDialogPane();
+            pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+            pane.setStyle("-fx-background-color: #fffaf5;");
+
+            ComboBox<GuideDTO> guideBox = new ComboBox<>(FXCollections.observableArrayList(guides));
+            guideBox.setCellFactory(ignored -> new ListCell<>() {
+                @Override
+                protected void updateItem(GuideDTO item, boolean empty) {
+                    super.updateItem(item, empty);
+                    setText(empty || item == null ? null : item.getTaille() + " - poitrine " + valueOrDash(item.getPoitrine()));
+                }
+            });
+            guideBox.setButtonCell(guideBox.getCellFactory().call(null));
+            if (!guides.isEmpty()) {
+                guideBox.getSelectionModel().selectFirst();
+            }
+
+            TextField tailleField = new TextField();
+            tailleField.setPromptText("Taille");
+            TextField poitrineField = new TextField();
+            poitrineField.setPromptText("Poitrine");
+            TextField tailleCmField = new TextField();
+            tailleCmField.setPromptText("Tour de taille");
+            TextField hanchesField = new TextField();
+            hanchesField.setPromptText("Hanches");
+
+            Button addButton = ViewFactory.createPrimaryButton("Ajouter guide");
+            addButton.setOnAction(event -> {
+                try {
+                    adminService.addGuide(selected.getId(), tailleField.getText().trim(), poitrineField.getText().trim(),
+                            tailleCmField.getText().trim(), hanchesField.getText().trim());
+                    UIUtils.showSuccess("Guide ajoute.");
+                    dialog.close();
+                } catch (Exception e) {
+                    UIUtils.showError(e.getMessage());
+                }
+            });
+
+            Button deleteButton = ViewFactory.createSecondaryButton("Supprimer guide");
+            deleteButton.setOnAction(event -> {
+                if (guideBox.getValue() == null) {
+                    UIUtils.showError("Selectionnez un guide.");
+                    return;
+                }
+                try {
+                    adminService.deleteGuide(guideBox.getValue().getId());
+                    UIUtils.showSuccess("Guide supprime.");
+                    dialog.close();
+                } catch (Exception e) {
+                    UIUtils.showError(e.getMessage());
+                }
+            });
+
+            VBox content = new VBox(12,
+                    new Label("Guides existants"),
+                    guideBox,
+                    new Label("Ajouter un guide"),
+                    tailleField, poitrineField, tailleCmField, hanchesField,
+                    new HBox(10, addButton, deleteButton));
+            pane.setContent(content);
+            dialog.showAndWait();
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
         }

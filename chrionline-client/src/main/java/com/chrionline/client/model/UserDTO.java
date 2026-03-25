@@ -12,6 +12,7 @@ public class UserDTO {
     private String role;
     private String statut;
     private Date dateInscription;
+    private Date dateNaissance;
 
     public int getId() {
         return id;
@@ -47,6 +48,10 @@ public class UserDTO {
 
     public Date getDateInscription() {
         return dateInscription;
+    }
+
+    public Date getDateNaissance() {
+        return dateNaissance;
     }
 
     public boolean isAdmin() {

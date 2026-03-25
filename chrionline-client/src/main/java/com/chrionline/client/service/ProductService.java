@@ -39,4 +39,13 @@ public class ProductService {
         }
         return JsonUtils.GSON.fromJson(response.getPayload(), ProductDTO.class);
     }
+
+    public List<ProductDTO> getByCategory(int categoryId) throws Exception {
+        Message response = tcp.send(new Message(Protocol.GET_PRODUCTS_BY_CATEGORIE, String.valueOf(categoryId)));
+        if (response.isError()) {
+            throw new IllegalStateException(response.getPayload());
+        }
+        Type listType = new TypeToken<List<ProductDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
 }

@@ -1,8 +1,11 @@
 package com.chrionline.client.service;
 
 import com.chrionline.client.model.OrderDTO;
+import com.chrionline.client.model.PaymentDTO;
 import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.model.UserDTO;
+import com.chrionline.client.model.GuideDTO;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.util.JsonUtils;
@@ -26,6 +29,11 @@ public class AdminService {
         Message response = sendAdmin(Protocol.ADMIN_GET_ORDERS, "");
         Type listType = new TypeToken<List<OrderDTO>>() { }.getType();
         return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public OrderDTO getOrderDetail(int orderId) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_ORDER_DETAIL, String.valueOf(orderId));
+        return JsonUtils.GSON.fromJson(response.getPayload(), OrderDTO.class);
     }
 
     public ProductDTO addProduct(int categorieId, String nom, String description, String matiere,
@@ -57,6 +65,55 @@ public class AdminService {
 
     public void updateStock(int tailleId, int newStock) throws Exception {
         sendAdmin(Protocol.ADMIN_UPDATE_STOCK, tailleId + "|" + newStock);
+    }
+
+    public ProductSizeDTO addSize(int produitId, String valeur, int stock) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_ADD_SIZE, produitId + "|" + valeur + "|" + stock);
+        return JsonUtils.GSON.fromJson(response.getPayload(), ProductSizeDTO.class);
+    }
+
+    public void deleteSize(int tailleId) throws Exception {
+        sendAdmin(Protocol.ADMIN_DELETE_SIZE, String.valueOf(tailleId));
+    }
+
+    public List<ProductSizeDTO> getSizes(int produitId) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_SIZES, String.valueOf(produitId));
+        Type listType = new TypeToken<List<ProductSizeDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public GuideDTO addGuide(int produitId, String taille, String poitrine, String tailleCm, String hanches) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_ADD_GUIDE, String.join("|",
+                String.valueOf(produitId), taille, poitrine, tailleCm, hanches));
+        return JsonUtils.GSON.fromJson(response.getPayload(), GuideDTO.class);
+    }
+
+    public void deleteGuide(int guideId) throws Exception {
+        sendAdmin(Protocol.ADMIN_DELETE_GUIDE, String.valueOf(guideId));
+    }
+
+    public List<GuideDTO> getGuides(int produitId) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_GUIDE, String.valueOf(produitId));
+        Type listType = new TypeToken<List<GuideDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public void updateUser(int userId, String nom, String prenom, String telephone, String adresse) throws Exception {
+        sendAdmin(Protocol.ADMIN_UPDATE_USER, String.join("|",
+                String.valueOf(userId), nom, prenom, telephone, adresse));
+    }
+
+    public void updateOrderStatus(int orderId, String newStatus) throws Exception {
+        sendAdmin(Protocol.ADMIN_UPDATE_ORDER_STATUT, orderId + "|" + newStatus);
+    }
+
+    public PaymentDTO getPayment(int commandeId) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_PAYMENT, String.valueOf(commandeId));
+        return JsonUtils.GSON.fromJson(response.getPayload(), PaymentDTO.class);
+    }
+
+    public void remboursement(int commandeId) throws Exception {
+        sendAdmin(Protocol.ADMIN_REMBOURSE, String.valueOf(commandeId));
     }
 
     private Message sendAdmin(String type, String data) throws Exception {

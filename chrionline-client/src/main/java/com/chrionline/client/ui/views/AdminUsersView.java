@@ -7,9 +7,12 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -31,13 +34,15 @@ public class AdminUsersView extends VBox {
         HBox actions = new HBox(10);
         Button refresh = ViewFactory.createSecondaryButton("Actualiser");
         refresh.setOnAction(event -> loadUsers());
+        Button edit = ViewFactory.createSecondaryButton("Modifier");
+        edit.setOnAction(event -> editUser());
         Button suspend = ViewFactory.createPrimaryButton("Suspendre");
         suspend.setOnAction(event -> changeUserStatus(true));
         Button activate = ViewFactory.createSecondaryButton("Activer");
         activate.setOnAction(event -> changeUserStatus(false));
-        actions.getChildren().addAll(refresh, suspend, activate);
+        actions.getChildren().addAll(refresh, edit, suspend, activate);
 
-        Label hint = new Label("Le serveur permet d'afficher, suspendre et reactiver les utilisateurs. Pas de modification de profil admin cote serveur actuellement.");
+        Label hint = new Label("Le serveur permet maintenant aussi la mise a jour admin du nom, prenom, telephone et adresse.");
         hint.setWrapText(true);
         hint.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
@@ -109,6 +114,42 @@ public class AdminUsersView extends VBox {
             loadUsers();
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void editUser() {
+        UserDTO selected = usersTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            UIUtils.showError("Selectionnez un utilisateur.");
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Modifier utilisateur");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setStyle("-fx-background-color: #fffaf5;");
+
+        TextField nomField = new TextField(selected.getNom());
+        TextField prenomField = new TextField(selected.getPrenom());
+        TextField telField = new TextField(valueOrDash(selected.getTelephone()).equals("-") ? "" : selected.getTelephone());
+        TextField adresseField = new TextField(valueOrDash(selected.getAdresse()).equals("-") ? "" : selected.getAdresse());
+
+        VBox content = new VBox(12,
+                new Label("Nom"), nomField,
+                new Label("Prenom"), prenomField,
+                new Label("Telephone"), telField,
+                new Label("Adresse"), adresseField);
+        dialog.getDialogPane().setContent(content);
+
+        if (dialog.showAndWait().filter(ButtonType.OK::equals).isPresent()) {
+            try {
+                adminService.updateUser(selected.getId(), nomField.getText().trim(), prenomField.getText().trim(),
+                        telField.getText().trim(), adresseField.getText().trim());
+                UIUtils.showSuccess("Utilisateur mis a jour.");
+                loadUsers();
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
         }
     }
 

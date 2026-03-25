@@ -39,4 +39,13 @@ public class OrderService {
         }
         return JsonUtils.GSON.fromJson(response.getPayload(), OrderDTO.class);
     }
+
+    public String pay(String modePaiement, double montant) throws Exception {
+        String payload = AppSession.getCurrentUser().getId() + "|" + modePaiement + "|" + montant;
+        Message response = tcp.send(new Message(Protocol.PAY, payload));
+        if (response.isError()) {
+            throw new IllegalStateException(response.getPayload());
+        }
+        return response.getPayload();
+    }
 }
