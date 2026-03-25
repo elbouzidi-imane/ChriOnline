@@ -50,4 +50,48 @@ public class CategoryDAO {
         }
         return null;
     }
+    public boolean existsByName(String nom) {
+        String sql = "SELECT COUNT(*) FROM categorie WHERE LOWER(nom) = LOWER(?)";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, nom);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public Category save(Category category) {
+        String sql = "INSERT INTO categorie(nom, description) VALUES(?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setString(1, category.getNom());
+            ps.setString(2, category.getDescription());
+
+            int affected = ps.executeUpdate();
+
+            if (affected > 0) {
+                ResultSet rs = ps.getGeneratedKeys();
+                if (rs.next()) {
+                    category.setId(rs.getInt(1));
+                }
+                return category;
+            }
+
+        } catch (Exception e) {
+            System.err.println("CategoryDAO.save : " + e.getMessage());
+        }
+
+        return null;
+
+    }
 }

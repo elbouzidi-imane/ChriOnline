@@ -98,6 +98,6 @@ public class OrderHandler {
             return Message.error("Erreur paiement : " + e.getMessage());
         }
     }
-    
+
 
 }

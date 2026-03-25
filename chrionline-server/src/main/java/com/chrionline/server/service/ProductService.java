@@ -14,17 +14,44 @@ public class ProductService {
 
     // ── Tous les produits actifs ──────────────────────
     public List<Product> getAllProducts() {
-        return productDAO.findAll();
+        List<Product> products = productDAO.findAll();
+
+        for (Product p : products) {
+            Category c = categoryDAO.findById(p.getCategorieId());
+            if (c != null) {
+                p.setCategorie(c);
+            }
+        }
+
+        return products;
     }
 
     // ── Produit par id ────────────────────────────────
     public Product getProductById(int id) {
-        return productDAO.findById(id);
+        Product p = productDAO.findById(id);
+
+        if (p != null) {
+            Category c = categoryDAO.findById(p.getCategorieId());
+            if (c != null) {
+                p.setCategorie(c);
+            }
+        }
+
+        return p;
     }
 
     // ── Produits par catégorie ────────────────────────
     public List<Product> getProductsByCategorie(int categorieId) {
-        return productDAO.findByCategorie(categorieId);
+        List<Product> products = productDAO.findByCategorie(categorieId);
+
+        for (Product p : products) {
+            Category c = categoryDAO.findById(p.getCategorieId());
+            if (c != null) {
+                p.setCategorie(c);
+            }
+        }
+
+        return products;
     }
 
     // ── Toutes les catégories ─────────────────────────

@@ -73,4 +73,7 @@ public class Protocol {
     public static final String OK    = "OK";
     public static final String ERROR = "ERROR";
     public static final String NOTIF = "NOTIF";
+    //── Admin — Categorie
+    public static final String ADMIN_ADD_CATEGORY = "ADMIN_ADD_CATEGORY";
+    public static final String ADMIN_GET_CATEGORIES = "ADMIN_GET_CATEGORIES";
 }

@@ -18,6 +18,7 @@ public class AdminHandler {
     private final GuideDAO       guideDAO       = new GuideDAO();
     private final SizeDAO        sizeDAO        = new SizeDAO();
     private final UserDAO        userDAO        = new UserDAO();
+    private final CategoryDAO categoryDAO = new CategoryDAO();
     private final Gson gson = new Gson();
 
     public Message handle(Message request) {
@@ -52,6 +53,8 @@ public class AdminHandler {
             // Paiement
             case Protocol.ADMIN_GET_PAYMENT -> handleGetPayment(request);
             case Protocol.ADMIN_REMBOURSE   -> handleRembourse(request);
+            case Protocol.ADMIN_ADD_CATEGORY -> handleAddCategory(request);
+            case Protocol.ADMIN_GET_CATEGORIES -> handleGetCategories(request);
             default -> Message.error("Type non géré par AdminHandler");
         };
     }
@@ -360,5 +363,44 @@ public class AdminHandler {
             return Message.error("Erreur : " + e.getMessage());
         }
     }
+    // payload : "adminId:nom|description"
+    private Message handleAddCategory(Message req) {
+        try {
+            String[] parts = getData(req).split("\\|", -1);
 
+            if (parts.length < 1) {
+                return Message.error("Format invalide");
+            }
+
+            Category category = new Category();
+            category.setNom(parts[0].trim());
+            category.setDescription(parts.length > 1 ? parts[1].trim() : "");
+
+            // ✅ 👉 AJOUTE ICI
+            if (categoryDAO.existsByName(category.getNom())) {
+                return Message.error("Catégorie déjà existe");
+            }
+
+            Category saved = categoryDAO.save(category);
+
+            if (saved == null) {
+                return Message.error("Erreur ajout catégorie");
+            }
+
+            return Message.ok(Protocol.OK, gson.toJson(saved));
+
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+    private Message handleGetCategories(Message req) {
+        try {
+            List<Category> categories = categoryDAO.findAll();
+
+            return Message.ok(Protocol.OK, gson.toJson(categories));
+
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
 }
