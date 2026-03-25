@@ -1,48 +1,107 @@
 package com.chrionline.server.service;
 
+import com.chrionline.server.model.Order;
 import com.chrionline.server.model.Payment;
+import com.chrionline.server.model.User;
+import com.chrionline.server.repository.OrderDAO;
 import com.chrionline.server.repository.PaymentDAO;
+import com.chrionline.server.repository.UserDAO;
 
 public class PaymentService {
 
     private final PaymentDAO paymentDAO = new PaymentDAO();
+    private final OrderDAO orderDAO = new OrderDAO();
+    private final UserDAO userDAO = new UserDAO();
+    private final EmailService emailService = EmailService.getInstance();
 
-    // ── Simuler un paiement ───────────────────────────
-    public Payment simulerPaiement(int commandeId, double montant,
-                                   String modePaiement) {
+    public Payment simulerPaiement(int commandeId, double montant, String modePaiement) {
         Payment payment = new Payment(commandeId, montant, modePaiement);
         payment.setStatut("VALIDE");
         payment.setReference("TXN-" + System.currentTimeMillis());
         return paymentDAO.save(payment);
     }
 
-    // ── Récupérer le paiement d'une commande ──────────
     public Payment getByCommande(int commandeId) {
         return paymentDAO.findByCommande(commandeId);
     }
 
-    // ── Rembourser ────────────────────────────────────
     public boolean rembourser(int commandeId) {
         Payment payment = paymentDAO.findByCommande(commandeId);
-        if (payment == null) return false;
-        // Dans ce projet : juste mettre à jour le statut
-        // En réel : appeler l'API bancaire
-        String sql = "UPDATE paiement SET statut='REMBOURSE' WHERE commande_id=?";
-        try (java.sql.Connection conn =
-                     com.chrionline.server.db.DatabaseManager
-                             .getInstance().getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, commandeId);
-            return ps.executeUpdate() > 0;
-        } catch (Exception e) {
-            System.err.println("PaymentService.rembourser : " + e.getMessage());
+        if (payment == null) {
             return false;
         }
+        return paymentDAO.updateStatut(commandeId, "REMBOURSE");
     }
 
-    // ── Vérifier si une commande est payée ────────────
     public boolean isPaye(int commandeId) {
         Payment payment = paymentDAO.findByCommande(commandeId);
         return payment != null && payment.isValide();
+    }
+
+    public boolean processRefundDecision(int commandeId, boolean approved, String detail, String estimatedDelay) {
+        Payment payment = paymentDAO.findByCommande(commandeId);
+        if (payment == null) {
+            return false;
+        }
+
+        Order order = orderDAO.findById(commandeId);
+        if (order == null) {
+            return false;
+        }
+
+        User user = userDAO.findById(order.getUtilisateurId());
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return false;
+        }
+
+        boolean updated = paymentDAO.updateStatut(commandeId, approved ? "REMBOURSE" : "REFUSE");
+        if (!updated) {
+            return false;
+        }
+
+        String subject;
+        String body;
+        if (approved) {
+            String delay = estimatedDelay == null || estimatedDelay.isBlank()
+                    ? "3 a 5 jours ouvrables"
+                    : estimatedDelay.trim();
+            String extra = detail == null || detail.isBlank() ? "" : "\nMessage admin : " + detail.trim() + "\n";
+            subject = "ChriOnline - Remboursement confirme";
+            body = """
+                    Bonjour %s,
+
+                    Votre demande d'annulation pour la commande %s a ete acceptee.
+
+                    Montant rembourse : %s DH
+                    Delai estime : %s
+                    %s
+                    L'equipe ChriOnline
+                    """.formatted(
+                    user.getPrenom() == null || user.getPrenom().isBlank() ? "client" : user.getPrenom(),
+                    order.getReference(),
+                    String.format("%.2f", payment.getMontant()),
+                    delay,
+                    extra
+            );
+        } else {
+            subject = "ChriOnline - Remboursement impossible";
+            body = """
+                    Bonjour %s,
+
+                    Votre demande de remboursement pour la commande %s n'a pas pu etre traitee.
+
+                    Motif : %s
+
+                    Pour toute question, contactez l'administration ChriOnline.
+
+                    L'equipe ChriOnline
+                    """.formatted(
+                    user.getPrenom() == null || user.getPrenom().isBlank() ? "client" : user.getPrenom(),
+                    order.getReference(),
+                    detail == null || detail.isBlank() ? "Motif non precise." : detail.trim()
+            );
+        }
+
+        return emailService.sendEmail(user.getEmail(), subject, body);
     }
 }

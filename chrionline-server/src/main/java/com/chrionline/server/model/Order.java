@@ -15,6 +15,7 @@ public class Order implements Serializable {
     private String          statut;          // EN_ATTENTE, VALIDEE, EXPEDIEE, LIVREE, ANNULEE
     private double          montantTotal;
     private String          adresseLivraison;
+    private String          motifAnnulation;
     private List<OrderLine> lignes = new ArrayList<>();
 
     public Order() {}
@@ -34,6 +35,7 @@ public class Order implements Serializable {
     public String          getStatut()           { return statut; }
     public double          getMontantTotal()     { return montantTotal; }
     public String          getAdresseLivraison() { return adresseLivraison; }
+    public String          getMotifAnnulation()  { return motifAnnulation; }
     public List<OrderLine> getLignes()           { return lignes; }
 
     public void setId(int id)                         { this.id = id; }
@@ -43,6 +45,7 @@ public class Order implements Serializable {
     public void setStatut(String statut)              { this.statut = statut; }
     public void setMontantTotal(double m)             { this.montantTotal = m; }
     public void setAdresseLivraison(String adr)       { this.adresseLivraison = adr; }
+    public void setMotifAnnulation(String motif)      { this.motifAnnulation = motif; }
     public void setLignes(List<OrderLine> lignes)     { this.lignes = lignes; }
 
     @Override

@@ -74,12 +74,16 @@ public class ClientHandler implements Runnable {
             case Protocol.PLACE_ORDER,
                  Protocol.GET_ORDERS,
                  Protocol.GET_ORDER,
-                         Protocol.PAY
+                 Protocol.CANCEL_ORDER,
+                 Protocol.GET_CANCELLATION_CONFIG,
+                 Protocol.PAY
                     -> orderHandler.handle(req);
 
             case Protocol.ADMIN_ADD_PRODUCT,
                  Protocol.ADMIN_UPDATE_PRODUCT,
                  Protocol.ADMIN_DELETE_PRODUCT,
+                 Protocol.ADMIN_ADD_CATEGORY,
+                 Protocol.ADMIN_GET_CATEGORIES,
                  Protocol.ADMIN_ADD_SIZE,
                  Protocol.ADMIN_DELETE_SIZE,
                  Protocol.ADMIN_GET_SIZES,
@@ -94,6 +98,8 @@ public class ClientHandler implements Runnable {
                  Protocol.ADMIN_GET_ORDERS,
                  Protocol.ADMIN_GET_ORDER_DETAIL,
                  Protocol.ADMIN_UPDATE_ORDER_STATUT,
+                 Protocol.ADMIN_UPDATE_CANCELLATION_CONFIG,
+                 Protocol.ADMIN_GET_CANCELLATION_CONFIG,
                  Protocol.ADMIN_GET_PAYMENT,
                  Protocol.ADMIN_REMBOURSE
                     -> adminHandler.handle(req);

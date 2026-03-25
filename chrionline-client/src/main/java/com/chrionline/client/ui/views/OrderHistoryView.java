@@ -1,5 +1,7 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.CancellationConfigDTO;
+import com.chrionline.client.model.CancellationResultDTO;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.OrderLineDTO;
 import com.chrionline.client.model.ProductDTO;
@@ -16,6 +18,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -39,6 +42,8 @@ public class OrderHistoryView extends VBox {
     private final OrderService orderService = new OrderService();
     private final ProductService productService = new ProductService();
     private final Map<Integer, ProductDTO> productCache = new HashMap<>();
+    private final TableView<OrderDTO> table = new TableView<>();
+    private CancellationConfigDTO cancellationConfig;
 
     public OrderHistoryView() {
         VBox shell = ViewFactory.createPageShell(
@@ -55,7 +60,6 @@ public class OrderHistoryView extends VBox {
         Label info = new Label("Toutes vos commandes sont affichees du plus recent au plus ancien.");
         info.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");
 
-        TableView<OrderDTO> table = new TableView<>();
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
         table.setStyle("-fx-background-radius: 18; -fx-border-radius: 18;");
 
@@ -77,6 +81,8 @@ public class OrderHistoryView extends VBox {
         actionCol.setCellValueFactory(data -> new ReadOnlyObjectWrapper<>(data.getValue()));
         actionCol.setCellFactory(ignored -> new TableCell<>() {
             private final Button detailButton = ViewFactory.createPrimaryButton("Voir");
+            private final Button cancelButton = ViewFactory.createSecondaryButton("Annuler");
+            private final HBox actions = new HBox(8, detailButton, cancelButton);
 
             {
                 detailButton.setOnAction(event -> {
@@ -85,22 +91,28 @@ public class OrderHistoryView extends VBox {
                         showDetails(order);
                     }
                 });
+                cancelButton.setOnAction(event -> {
+                    OrderDTO order = getItem();
+                    if (order != null) {
+                        cancelOrder(order);
+                    }
+                });
             }
 
             @Override
             protected void updateItem(OrderDTO item, boolean empty) {
                 super.updateItem(item, empty);
-                setGraphic(empty || item == null ? null : detailButton);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+                cancelButton.setVisible(isOrderCancellable(item));
+                cancelButton.setManaged(isOrderCancellable(item));
+                setGraphic(actions);
             }
         });
 
         table.getColumns().setAll(refCol, dateCol, statusCol, totalCol, actionCol);
-
-        try {
-            table.getItems().setAll(orderService.getOrders());
-        } catch (Exception e) {
-            UIUtils.showError(e.getMessage());
-        }
 
         Label summaryTitle = new Label("Mes commandes");
         summaryTitle.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #162521;");
@@ -110,6 +122,72 @@ public class OrderHistoryView extends VBox {
         card.setStyle(ViewFactory.cardStyle());
         shell.getChildren().add(card);
         VBox.setVgrow(table, Priority.ALWAYS);
+
+        loadCancellationConfig();
+        loadOrders();
+    }
+
+    private void loadOrders() {
+        try {
+            table.getItems().setAll(orderService.getOrders());
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void loadCancellationConfig() {
+        try {
+            cancellationConfig = orderService.getCancellationConfig();
+        } catch (Exception e) {
+            cancellationConfig = null;
+        }
+    }
+
+    private boolean isOrderCancellable(OrderDTO order) {
+        return cancellationConfig != null
+                && order != null
+                && order.getStatut() != null
+                && order.getStatut().equalsIgnoreCase(cancellationConfig.getCancellableStatus());
+    }
+
+    private void cancelOrder(OrderDTO order) {
+        if (!isOrderCancellable(order)) {
+            UIUtils.showError("Cette commande ne peut plus etre annulee.");
+            return;
+        }
+
+        String reason = "";
+        if (cancellationConfig.isReasonRequired()) {
+            TextInputDialog dialog = new TextInputDialog();
+            dialog.setTitle("Annulation de commande");
+            dialog.setHeaderText("Motif d'annulation");
+            dialog.setContentText("Veuillez saisir un motif :");
+            dialog.getDialogPane().setStyle("-fx-background-color: linear-gradient(to bottom, #fffaf5, #ffe7c7);");
+            var result = dialog.showAndWait();
+            if (result.isEmpty()) {
+                return;
+            }
+            reason = result.get().trim();
+            if (reason.isEmpty()) {
+                UIUtils.showError("Le motif d'annulation est obligatoire.");
+                return;
+            }
+        } else if (!UIUtils.confirm("Annuler la commande", "Confirmer l'annulation de la commande " + order.getReference() + " ?")) {
+            return;
+        }
+
+        try {
+            CancellationResultDTO result = orderService.cancelOrder(order.getId(), reason);
+            UIUtils.showSuccess(
+                    result.getMessage()
+                            + "\nReference : " + result.getOrderReference()
+                            + "\nRemboursement : " + result.getRefundMessage()
+                            + "\nDelai estime : " + result.getEstimatedRefundDelay()
+            );
+            loadOrders();
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
     }
 
     private void showDetails(OrderDTO order) {

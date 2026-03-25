@@ -4,6 +4,7 @@ import com.chrionline.client.model.CartDTO;
 import com.chrionline.client.model.CartLineDTO;
 import com.chrionline.client.service.CartService;
 import com.chrionline.client.service.OrderService;
+import com.chrionline.client.session.AppSession;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.PriceUtils;
 import com.chrionline.client.util.UIUtils;
@@ -20,6 +21,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -28,6 +30,12 @@ import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.time.Year;
+import java.time.format.TextStyle;
+import java.util.Locale;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class CheckoutView extends ScrollPane {
     private final CartService cartService = new CartService();
@@ -35,9 +43,19 @@ public class CheckoutView extends ScrollPane {
 
     private final TextField cardNumberField = createField("Numero de carte bancaire");
     private final TextField cardHolderField = createField("Nom sur la carte");
-    private final TextField expiryField = createField("Date d'expiration MM/AA");
     private final TextField cvvField = createField("Code CVV");
     private final TextField paypalEmailField = createField("Email PayPal");
+    private final ComboBox<String> expiryMonthBox = new ComboBox<>(FXCollections.observableArrayList(
+            IntStream.rangeClosed(1, 12)
+                    .mapToObj(month -> String.format("%02d - %s", month, java.time.Month.of(month)
+                            .getDisplayName(TextStyle.SHORT, Locale.FRENCH)))
+                    .collect(Collectors.toList())
+    ));
+    private final ComboBox<Integer> expiryYearBox = new ComboBox<>(FXCollections.observableArrayList(
+            IntStream.rangeClosed(Year.now().getValue(), Year.now().getValue() + 12)
+                    .boxed()
+                    .collect(Collectors.toList())
+    ));
 
     public CheckoutView() {
         VBox page = new VBox(18);
@@ -87,6 +105,9 @@ public class CheckoutView extends ScrollPane {
         });
 
         TextField addressField = createField("Adresse de livraison");
+        if (AppSession.isLoggedIn() && AppSession.getCurrentUser().getAdresse() != null) {
+            addressField.setText(AppSession.getCurrentUser().getAdresse());
+        }
 
         ComboBox<String> paymentBox = new ComboBox<>(FXCollections.observableArrayList("CARTE_BANCAIRE", "PAYPAL", "FICTIF"));
         paymentBox.setPromptText("Mode de paiement");
@@ -95,6 +116,29 @@ public class CheckoutView extends ScrollPane {
         ComboBox<String> deliveryBox = new ComboBox<>(FXCollections.observableArrayList("STANDARD", "EXPRESS", "POINT_RELAIS"));
         deliveryBox.setPromptText("Mode de livraison");
         deliveryBox.setStyle("-fx-background-radius: 14;");
+
+        expiryMonthBox.setPromptText("Mois d'expiration");
+        expiryYearBox.setPromptText("Annee d'expiration");
+        expiryMonthBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
+        expiryYearBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
+        expiryMonthBox.setPrefWidth(190);
+        expiryYearBox.setPrefWidth(140);
+        expiryMonthBox.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+            }
+        });
+        expiryMonthBox.setButtonCell(expiryMonthBox.getCellFactory().call(null));
+        expiryYearBox.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(Integer item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.valueOf(item));
+            }
+        });
+        expiryYearBox.setButtonCell(expiryYearBox.getCellFactory().call(null));
 
         VBox paymentDetailsBox = new VBox(10);
         paymentDetailsBox.setPadding(new Insets(14));
@@ -125,6 +169,9 @@ public class CheckoutView extends ScrollPane {
                 paymentDetailsBox.getChildren().addAll(paymentDetailTitle, fictiveLabel);
             }
         });
+
+        applyDigitLimit(cardNumberField, 16);
+        applyDigitLimit(cvvField, 3);
 
         Button confirmButton = new Button("Confirmer la commande");
         confirmButton.setStyle("-fx-background-color: #eb8b1b; -fx-text-fill: white; -fx-font-weight: bold; "
@@ -206,16 +253,13 @@ public class CheckoutView extends ScrollPane {
     }
 
     private void validateCard() {
-        String cardNumber = cardNumberField.getText().replace(" ", "");
+        String cardNumber = cardNumberField.getText().trim();
         if (cardNumberField.getText().isBlank() || cardHolderField.getText().isBlank()
-                || expiryField.getText().isBlank() || cvvField.getText().isBlank()) {
+                || expiryMonthBox.getValue() == null || expiryYearBox.getValue() == null || cvvField.getText().isBlank()) {
             throw new IllegalArgumentException("Remplissez tous les champs de la carte bancaire.");
         }
         if (!cardNumber.matches("\\d{16}")) {
             throw new IllegalArgumentException("Le numero de carte doit contenir 16 chiffres.");
-        }
-        if (!expiryField.getText().trim().matches("(0[1-9]|1[0-2])/\\d{2}")) {
-            throw new IllegalArgumentException("La date d'expiration doit etre au format MM/AA.");
         }
         if (!cvvField.getText().trim().matches("\\d{3}")) {
             throw new IllegalArgumentException("Le code CVV doit contenir 3 chiffres.");
@@ -244,7 +288,7 @@ public class CheckoutView extends ScrollPane {
         grid.setHgap(12);
         grid.setVgap(12);
 
-        Label note = createInfoLabel("Les informations de carte sont verifiees localement avant l'envoi du paiement simule.");
+        Label note = createInfoLabel("Le numero de carte est limite a 16 chiffres, le CVV a 3 chiffres, et l'expiration se choisit directement.");
         grid.add(note, 0, 0, 2, 1);
 
         grid.add(new Label("Nom du titulaire"), 0, 1);
@@ -252,13 +296,15 @@ public class CheckoutView extends ScrollPane {
         grid.add(new Label("Numero de carte"), 0, 3);
         grid.add(cardNumberField, 0, 4, 2, 1);
         grid.add(new Label("Expiration"), 0, 5);
-        grid.add(expiryField, 0, 6);
+        HBox expiryRow = new HBox(10, expiryMonthBox, expiryYearBox);
+        HBox.setHgrow(expiryMonthBox, Priority.ALWAYS);
+        HBox.setHgrow(expiryYearBox, Priority.ALWAYS);
+        grid.add(expiryRow, 0, 6);
         grid.add(new Label("CVV"), 1, 5);
         grid.add(cvvField, 1, 6);
 
         GridPane.setHgrow(cardHolderField, Priority.ALWAYS);
         GridPane.setHgrow(cardNumberField, Priority.ALWAYS);
-        GridPane.setHgrow(expiryField, Priority.ALWAYS);
         GridPane.setHgrow(cvvField, Priority.ALWAYS);
         GridPane.setHalignment(note, HPos.LEFT);
         return grid;
@@ -282,5 +328,16 @@ public class CheckoutView extends ScrollPane {
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
         }
+    }
+
+    private void applyDigitLimit(TextField field, int maxLength) {
+        UnaryOperator<TextFormatter.Change> filter = change -> {
+            String next = change.getControlNewText();
+            if (!next.matches("\\d{0," + maxLength + "}")) {
+                return null;
+            }
+            return change;
+        };
+        field.setTextFormatter(new TextFormatter<>(filter));
     }
 }

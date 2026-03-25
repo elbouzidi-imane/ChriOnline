@@ -1,5 +1,7 @@
 package com.chrionline.client.service;
 
+import com.chrionline.client.model.CategoryDTO;
+import com.chrionline.client.model.CancellationConfigDTO;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.PaymentDTO;
 import com.chrionline.client.model.ProductDTO;
@@ -114,6 +116,46 @@ public class AdminService {
 
     public void remboursement(int commandeId) throws Exception {
         sendAdmin(Protocol.ADMIN_REMBOURSE, String.valueOf(commandeId));
+    }
+
+    public void processRefundDecision(int commandeId, boolean approved, String detail, String estimatedDelay) throws Exception {
+        sendAdmin(
+                Protocol.ADMIN_REMBOURSE,
+                String.join("|",
+                        String.valueOf(commandeId),
+                        approved ? "APPROVE" : "REFUSE",
+                        detail == null ? "" : detail,
+                        estimatedDelay == null ? "" : estimatedDelay)
+        );
+    }
+
+    public CancellationConfigDTO getCancellationConfig() throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_CANCELLATION_CONFIG, "");
+        return JsonUtils.GSON.fromJson(response.getPayload(), CancellationConfigDTO.class);
+    }
+
+    public CancellationConfigDTO updateCancellationConfig(String status, boolean reasonRequired,
+                                                          boolean automaticRefund, String estimatedDelay) throws Exception {
+        Message response = sendAdmin(
+                Protocol.ADMIN_UPDATE_CANCELLATION_CONFIG,
+                String.join("|",
+                        status,
+                        String.valueOf(reasonRequired),
+                        String.valueOf(automaticRefund),
+                        estimatedDelay == null ? "" : estimatedDelay)
+        );
+        return JsonUtils.GSON.fromJson(response.getPayload(), CancellationConfigDTO.class);
+    }
+
+    public CategoryDTO addCategory(String nom, String description) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_ADD_CATEGORY, nom + "|" + (description == null ? "" : description));
+        return JsonUtils.GSON.fromJson(response.getPayload(), CategoryDTO.class);
+    }
+
+    public List<CategoryDTO> getAdminCategories() throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_CATEGORIES, "");
+        Type listType = new TypeToken<List<CategoryDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
     }
 
     private Message sendAdmin(String type, String data) throws Exception {

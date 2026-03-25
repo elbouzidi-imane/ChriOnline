@@ -69,16 +69,13 @@ public class LoginView extends HBox {
         emailField.setMaxWidth(340);
         emailField.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
 
-        PasswordField passwordField = new PasswordField();
-        passwordField.setPromptText("Mot de passe");
-        passwordField.setMaxWidth(340);
-        passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
+        PasswordToggleControl passwordField = new PasswordToggleControl("Mot de passe");
 
         Button loginButton = ViewFactory.createPrimaryButton("Se connecter");
         loginButton.setDefaultButton(true);
         loginButton.setOnAction(event -> {
             try {
-                var user = authService.login(emailField.getText().trim(), passwordField.getText());
+                var user = authService.login(emailField.getText().trim(), passwordField.getValue());
                 AppSession.setCurrentUser(user);
                 if (user.isAdmin()) {
                     NavigationManager.navigateTo(new AdminView());
@@ -151,6 +148,55 @@ public class LoginView extends HBox {
             UIUtils.showSuccess(authService.resetPassword(emailField.getText().trim(), newPasswordField.getText()));
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private static final class PasswordToggleControl extends StackPane {
+        private final PasswordField passwordField = new PasswordField();
+        private final TextField visibleField = new TextField();
+
+        private PasswordToggleControl(String prompt) {
+            passwordField.setPromptText(prompt);
+            visibleField.setPromptText(prompt);
+            passwordField.setMaxWidth(340);
+            visibleField.setMaxWidth(340);
+            passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
+            visibleField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
+            visibleField.setManaged(false);
+            visibleField.setVisible(false);
+
+            Button eyeButton = ViewFactory.createSecondaryButton("\uD83D\uDC41");
+            eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                    + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            eyeButton.setOnAction(event -> toggleVisibility(eyeButton));
+
+            StackPane.setAlignment(eyeButton, Pos.CENTER_RIGHT);
+            StackPane.setMargin(eyeButton, new Insets(0, 8, 0, 0));
+            getChildren().addAll(passwordField, visibleField, eyeButton);
+        }
+
+        private void toggleVisibility(Button eyeButton) {
+            if (visibleField.isVisible()) {
+                passwordField.setText(visibleField.getText());
+                visibleField.setVisible(false);
+                visibleField.setManaged(false);
+                passwordField.setVisible(true);
+                passwordField.setManaged(true);
+                eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            } else {
+                visibleField.setText(passwordField.getText());
+                passwordField.setVisible(false);
+                passwordField.setManaged(false);
+                visibleField.setVisible(true);
+                visibleField.setManaged(true);
+                eyeButton.setStyle("-fx-background-color: #daf1e9; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
+                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            }
+        }
+
+        private String getValue() {
+            return visibleField.isVisible() ? visibleField.getText() : passwordField.getText();
         }
     }
 }

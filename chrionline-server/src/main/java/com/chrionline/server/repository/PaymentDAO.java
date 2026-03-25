@@ -58,4 +58,17 @@ public class PaymentDAO {
         }
         return null;
     }
+
+    public boolean updateStatut(int commandeId, String statut) {
+        String sql = "UPDATE paiement SET statut = ? WHERE commande_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, statut);
+            ps.setInt(2, commandeId);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("PaymentDAO.updateStatut : " + e.getMessage());
+            return false;
+        }
+    }
 }
