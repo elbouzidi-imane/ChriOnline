@@ -13,6 +13,7 @@ public class PaymentService {
     private final OrderDAO orderDAO = new OrderDAO();
     private final UserDAO userDAO = new UserDAO();
     private final EmailService emailService = EmailService.getInstance();
+    private final NotificationService notificationService = new NotificationService();
 
     public Payment simulerPaiement(int commandeId, double montant, String modePaiement) {
         Payment payment = new Payment(commandeId, montant, modePaiement);
@@ -102,6 +103,13 @@ public class PaymentService {
             );
         }
 
-        return emailService.sendEmail(user.getEmail(), subject, body);
+        boolean sent = emailService.sendEmail(user.getEmail(), subject, body);
+        notificationService.notifyClientAboutAdminAction(
+                user.getId(),
+                approved
+                        ? "Votre remboursement pour la commande " + order.getReference() + " a ete valide."
+                        : "Votre remboursement pour la commande " + order.getReference() + " a ete refuse."
+        );
+        return sent;
     }
 }

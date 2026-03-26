@@ -1,6 +1,8 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.NotificationDTO;
 import com.chrionline.client.service.AuthService;
+import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.UIUtils;
@@ -23,10 +25,12 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 
+import java.util.List;
 import java.util.Optional;
 
 public class LoginView extends HBox {
     private final AuthService authService = new AuthService();
+    private final NotificationService notificationService = new NotificationService();
 
     public LoginView() {
         setSpacing(0);
@@ -110,6 +114,7 @@ public class LoginView extends HBox {
             try {
                 var user = authService.login(emailField.getText().trim(), passwordField.getValue());
                 AppSession.setCurrentUser(user);
+                showPendingNotifications();
                 if (user.isAdmin()) {
                     NavigationManager.navigateTo(new AdminView());
                 } else {
@@ -129,6 +134,26 @@ public class LoginView extends HBox {
         formCard.getChildren().addAll(title, subtitle, emailField, passwordField, loginButton, registerLink, catalogLink, forgotLink, homeLink);
         form.getChildren().add(formCard);
         getChildren().addAll(marketing, form);
+    }
+
+    private void showPendingNotifications() {
+        try {
+            List<NotificationDTO> notifications = notificationService.getMyNotifications();
+            int shown = 0;
+            for (NotificationDTO notification : notifications) {
+                if (notification.isLue()) {
+                    continue;
+                }
+                UIUtils.showInfo(notification.getMessage());
+                notificationService.markAsRead(notification.getId());
+                shown++;
+                if (shown >= 5) {
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("LoginView.showPendingNotifications : " + e.getMessage());
+        }
     }
 
     private Hyperlink createLink(String text, Parent targetView) {

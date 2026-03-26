@@ -33,6 +33,7 @@ public class OrderService {
     private final PromoService promoService = new PromoService();
     private final UserDAO userDAO = new UserDAO();
     private final EmailService emailService = EmailService.getInstance();
+    private final NotificationService notificationService = new NotificationService();
 
     public Order validerCommande(int userId, String adresse,
                                  String modePaiement, String modeLivraison, String promoCode) {
@@ -98,6 +99,7 @@ public class OrderService {
                 if (taille.getId() == ligne.getTailleId()) {
                     int newStock = taille.getStock() - ligne.getQuantite();
                     productDAO.updateStock(taille.getId(), newStock);
+                    notifyLowStock(product, taille.getValeur(), newStock);
                     break;
                 }
             }
@@ -120,6 +122,10 @@ public class OrderService {
             promoService.registerUsage(normalizedPromoCode, userId, order.getId(), discountAmount);
         }
 
+        notificationService.notifyAdmins(
+                "Nouvelle commande " + order.getReference() + " a traiter. Montant: "
+                        + String.format("%.2f", order.getMontantTotal()) + " MAD"
+        );
         sendConfirmationEmail(order);
         return order;
     }
@@ -159,6 +165,10 @@ public class OrderService {
         }
 
         sendStatusEmail(order.getUtilisateurId(), order.getReference(), statut);
+        notificationService.notifyClientAboutAdminAction(
+                order.getUtilisateurId(),
+                "Votre commande " + order.getReference() + " est maintenant " + statut + "."
+        );
         return true;
     }
 
@@ -196,6 +206,10 @@ public class OrderService {
         orderDAO.updateCancellationInfo(orderId, "ANNULEE", reason);
         order.setStatut("ANNULEE");
         order.setMotifAnnulation(reason);
+        notificationService.notifyAdminsAboutClient(
+                userId,
+                "a annule la commande " + order.getReference() + "."
+        );
 
         String refundMessage;
         if (config.isAutomaticRefund()) {
@@ -262,5 +276,16 @@ public class OrderService {
         } catch (Exception e) {
             System.err.println("OrderService.updateReference : " + e.getMessage());
         }
+    }
+
+    private void notifyLowStock(Product product, String sizeValue, int newStock) {
+        if (product == null || newStock > 5) {
+            return;
+        }
+        String level = newStock == 0 ? "Rupture" : "Stock faible";
+        String suffix = sizeValue == null || sizeValue.isBlank() ? "" : " (taille " + sizeValue + ")";
+        notificationService.notifyAdmins(
+                level + " sur " + product.getNom() + suffix + " : reste " + newStock + " unite(s)."
+        );
     }
 }

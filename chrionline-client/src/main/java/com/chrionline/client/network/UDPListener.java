@@ -1,7 +1,6 @@
 package com.chrionline.client.network;
 
 import com.chrionline.client.util.UIUtils;
-import com.chrionline.common.AppConstants;
 import javafx.application.Platform;
 
 import java.net.DatagramPacket;
@@ -11,16 +10,22 @@ import java.nio.charset.StandardCharsets;
 
 public class UDPListener implements Runnable {
     private volatile boolean running = true;
-    private DatagramSocket socket;
+    private final DatagramSocket socket;
+    private static volatile int boundPort;
+
+    public UDPListener() throws SocketException {
+        socket = new DatagramSocket(0);
+        boundPort = socket.getLocalPort();
+        System.out.println("UDP listener demarre sur le port " + boundPort);
+    }
 
     @Override
     public void run() {
-        try (DatagramSocket datagramSocket = new DatagramSocket(AppConstants.PORT_UDP)) {
-            socket = datagramSocket;
+        try {
             byte[] buffer = new byte[1024];
             while (running) {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                datagramSocket.receive(packet);
+                socket.receive(packet);
                 String message = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
                 Platform.runLater(() -> UIUtils.showInfo(message));
             }
@@ -35,8 +40,12 @@ public class UDPListener implements Runnable {
 
     public void stopListening() {
         running = false;
-        if (socket != null && !socket.isClosed()) {
+        if (!socket.isClosed()) {
             socket.close();
         }
+    }
+
+    public static int getBoundPort() {
+        return boundPort;
     }
 }

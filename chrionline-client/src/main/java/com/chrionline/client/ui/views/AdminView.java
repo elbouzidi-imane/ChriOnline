@@ -1,17 +1,24 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.NotificationDTO;
 import com.chrionline.client.service.AdminService;
+import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.service.ProductService;
 import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+
+import java.text.SimpleDateFormat;
+import java.util.List;
 
 public class AdminView extends VBox {
     private final AdminService adminService = new AdminService();
     private final ProductService productService = new ProductService();
+    private final NotificationService notificationService = new NotificationService();
 
     private final Label productsCount = new Label("0");
     private final Label usersCount = new Label("0");
@@ -69,7 +76,9 @@ public class AdminView extends VBox {
         );
 
         welcomeCard.getChildren().addAll(welcomeTitle, welcomeText, quickActions);
-        content.getChildren().addAll(stats, welcomeCard, capabilitiesCard);
+        VBox notificationsCard = createNotificationsCard();
+
+        content.getChildren().addAll(stats, welcomeCard, capabilitiesCard, notificationsCard);
 
         getChildren().add(AdminViewSupport.createAdminPage(
                 "Dashboard administrateur",
@@ -96,5 +105,57 @@ public class AdminView extends VBox {
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
         }
+    }
+
+    private VBox createNotificationsCard() {
+        Label title = new Label("Notifications admin recentes");
+        title.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+        VBox items = new VBox(10);
+        try {
+            List<NotificationDTO> notifications = notificationService.getMyNotifications();
+            if (notifications.isEmpty()) {
+                items.getChildren().add(createNotificationItem("Aucune notification admin disponible.", null));
+            } else {
+                SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+                for (NotificationDTO notification : notifications) {
+                    items.getChildren().add(createNotificationItem(
+                            notification.getMessage(),
+                            notification.getCreatedAt() == null ? null : format.format(notification.getCreatedAt())
+                    ));
+                    if (!notification.isLue()) {
+                        notificationService.markAsRead(notification.getId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            items.getChildren().add(createNotificationItem("Impossible de charger les notifications admin.", null));
+        }
+
+        ScrollPane scrollPane = new ScrollPane(items);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefViewportHeight(240);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
+        VBox card = new VBox(12, title, scrollPane);
+        card.setPadding(new Insets(18));
+        card.setStyle(ViewFactory.cardStyle());
+        return card;
+    }
+
+    private VBox createNotificationItem(String message, String dateText) {
+        Label messageLabel = new Label(message);
+        messageLabel.setWrapText(true);
+        messageLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #1f2937;");
+
+        VBox box = new VBox(6, messageLabel);
+        if (dateText != null) {
+            Label dateLabel = new Label(dateText);
+            dateLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8f98;");
+            box.getChildren().add(dateLabel);
+        }
+        box.setPadding(new Insets(12));
+        box.setStyle("-fx-background-color: rgba(255,255,255,0.82); -fx-background-radius: 16;");
+        return box;
     }
 }

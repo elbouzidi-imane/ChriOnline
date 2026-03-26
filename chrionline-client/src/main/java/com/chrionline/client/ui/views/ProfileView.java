@@ -1,6 +1,8 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.NotificationDTO;
 import com.chrionline.client.service.AuthService;
+import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.UIUtils;
@@ -8,14 +10,17 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.text.SimpleDateFormat;
+import java.util.List;
 
 public class ProfileView extends VBox {
     private final AuthService authService = new AuthService();
+    private final NotificationService notificationService = new NotificationService();
 
     public ProfileView() {
         if (!AppSession.isLoggedIn()) {
@@ -119,7 +124,9 @@ public class ProfileView extends VBox {
         card.setPadding(new Insets(18));
         card.setStyle(ViewFactory.cardStyle());
 
-        getChildren().addAll(title, subtitle, backButton, card);
+        VBox notificationsCard = createNotificationsCard();
+
+        getChildren().addAll(title, subtitle, backButton, card, notificationsCard);
     }
 
     private TextField createField(String prompt, String value) {
@@ -127,5 +134,58 @@ public class ProfileView extends VBox {
         field.setPromptText(prompt);
         field.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
         return field;
+    }
+
+    private VBox createNotificationsCard() {
+        Label header = new Label("Notifications recentes");
+        header.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+        VBox items = new VBox(10);
+        try {
+            List<NotificationDTO> notifications = notificationService.getMyNotifications();
+            if (notifications.isEmpty()) {
+                items.getChildren().add(createNotificationLabel("Aucune notification pour le moment.", null, true));
+            } else {
+                SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+                for (NotificationDTO notification : notifications) {
+                    items.getChildren().add(createNotificationLabel(
+                            notification.getMessage(),
+                            notification.getCreatedAt() == null ? null : format.format(notification.getCreatedAt()),
+                            false
+                    ));
+                    if (!notification.isLue()) {
+                        notificationService.markAsRead(notification.getId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            items.getChildren().add(createNotificationLabel("Impossible de charger les notifications.", null, true));
+        }
+
+        ScrollPane scrollPane = new ScrollPane(items);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPrefViewportHeight(240);
+        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
+        VBox card = new VBox(12, header, scrollPane);
+        card.setPadding(new Insets(18));
+        card.setStyle(ViewFactory.cardStyle());
+        return card;
+    }
+
+    private VBox createNotificationLabel(String message, String dateText, boolean muted) {
+        Label messageLabel = new Label(message);
+        messageLabel.setWrapText(true);
+        messageLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: " + (muted ? "#6b7280;" : "#1f2937;"));
+
+        VBox box = new VBox(6, messageLabel);
+        if (dateText != null) {
+            Label dateLabel = new Label(dateText);
+            dateLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8f98;");
+            box.getChildren().add(dateLabel);
+        }
+        box.setPadding(new Insets(12));
+        box.setStyle("-fx-background-color: rgba(255,255,255,0.82); -fx-background-radius: 16;");
+        return box;
     }
 }

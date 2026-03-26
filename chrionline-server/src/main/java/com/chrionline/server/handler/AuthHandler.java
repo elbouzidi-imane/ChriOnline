@@ -3,12 +3,14 @@ package com.chrionline.server.handler;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.User;
+import com.chrionline.server.service.NotificationService;
 import com.chrionline.server.service.UserService;
 import com.google.gson.Gson;
 
 public class AuthHandler {
 
     private final UserService userService = new UserService();
+    private final NotificationService notificationService = new NotificationService();
     private final Gson gson = new Gson();
 
     public Message handle(Message request) {
@@ -23,6 +25,9 @@ public class AuthHandler {
             case Protocol.RESET_PASSWORD -> handleResetPassword(request);
             case Protocol.UPDATE_PROFILE -> handleUpdateProfile(request);
             case Protocol.UPDATE_NOTIFICATION_PREFERENCE -> handleUpdateNotificationPreference(request);
+            case Protocol.REGISTER_UDP_PORT -> Message.ok(Protocol.REGISTER_UDP_PORT, "Port UDP enregistre");
+            case Protocol.GET_NOTIFICATIONS -> handleGetNotifications(request);
+            case Protocol.MARK_NOTIFICATION_READ -> handleMarkNotificationRead(request);
             case Protocol.DEACTIVATE_ACCOUNT -> handleDeactivateAccount(request);
             case Protocol.DELETE_ACCOUNT -> handleDeleteAccount(request);
             default -> Message.error("Type non gere par AuthHandler");
@@ -138,8 +143,12 @@ public class AuthHandler {
         String telephone = parts[3].trim();
         String adresse = parts[4].trim();
         String dateNaissance = parts.length > 5 ? parts[5].trim() : "";
+        User existingUser = userService.getUserById(userId);
         boolean ok = userService.updateProfile(userId, nom, prenom, telephone, adresse, dateNaissance);
         if (!ok) return Message.error("Erreur mise a jour profil");
+        if (existingUser != null && !existingUser.isAdmin()) {
+            notificationService.notifyAdminsAboutClient(userId, "a mis a jour son profil.");
+        }
         return Message.ok(Protocol.UPDATE_PROFILE, "Profil mis a jour");
     }
 
@@ -163,8 +172,12 @@ public class AuthHandler {
     private Message handleDeactivateAccount(Message req) {
         try {
             int userId = Integer.parseInt(req.getPayload().trim());
+            User user = userService.getUserById(userId);
             boolean ok = userService.deactivateAccount(userId);
             if (!ok) return Message.error("Compte introuvable");
+            if (user != null && !user.isAdmin()) {
+                notificationService.notifyAdminsAboutClient(userId, "a desactive son compte.");
+            }
             return Message.ok(Protocol.DEACTIVATE_ACCOUNT, "Compte desactive");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
@@ -174,9 +187,40 @@ public class AuthHandler {
     private Message handleDeleteAccount(Message req) {
         try {
             int userId = Integer.parseInt(req.getPayload().trim());
+            User user = userService.getUserById(userId);
             boolean ok = userService.deleteAccount(userId);
             if (!ok) return Message.error("Compte introuvable");
+            if (user != null && !user.isAdmin()) {
+                notificationService.notifyAdminsAboutClient(userId, "a supprime son compte.");
+            }
             return Message.ok(Protocol.DELETE_ACCOUNT, "Compte supprime definitivement");
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleGetNotifications(Message req) {
+        try {
+            int userId = Integer.parseInt(req.getPayload().trim());
+            return Message.ok(Protocol.GET_NOTIFICATIONS, gson.toJson(notificationService.getNotifications(userId)));
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleMarkNotificationRead(Message req) {
+        try {
+            String[] parts = req.getPayload().split("\\|", -1);
+            if (parts.length < 2) {
+                return Message.error("Format invalide");
+            }
+            int userId = Integer.parseInt(parts[0].trim());
+            int notificationId = Integer.parseInt(parts[1].trim());
+            boolean ok = notificationService.markAsRead(userId, notificationId);
+            if (!ok) {
+                return Message.error("Notification introuvable");
+            }
+            return Message.ok(Protocol.MARK_NOTIFICATION_READ, "Notification marquee comme lue");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
         }

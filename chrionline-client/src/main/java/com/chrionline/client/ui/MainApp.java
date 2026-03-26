@@ -8,6 +8,8 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
 
+import java.net.SocketException;
+
 public class MainApp extends Application {
     private UDPListener udpListener;
 
@@ -21,10 +23,14 @@ public class MainApp extends Application {
             return;
         }
 
-        udpListener = new UDPListener();
-        Thread udpThread = new Thread(udpListener, "chrionline-udp-listener");
-        udpThread.setDaemon(true);
-        udpThread.start();
+        try {
+            udpListener = new UDPListener();
+            Thread udpThread = new Thread(udpListener, "chrionline-udp-listener");
+            udpThread.setDaemon(true);
+            udpThread.start();
+        } catch (SocketException e) {
+            UIUtils.showError("Impossible de demarrer les notifications locales : " + e.getMessage());
+        }
 
         NavigationManager.init(stage);
         NavigationManager.navigateTo(new HomeView());

@@ -7,6 +7,8 @@ import com.chrionline.server.handler.AuthHandler;
 import com.chrionline.server.handler.CartHandler;
 import com.chrionline.server.handler.OrderHandler;
 import com.chrionline.server.handler.ProductHandler;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.EOFException;
 import java.io.ObjectInputStream;
@@ -21,6 +23,8 @@ public class ClientHandler implements Runnable {
     private final CartHandler cartHandler = new CartHandler();
     private final OrderHandler orderHandler = new OrderHandler();
     private final AdminHandler adminHandler = new AdminHandler();
+    private int currentUserId;
+    private boolean currentUserAdmin;
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -36,6 +40,7 @@ public class ClientHandler implements Runnable {
             while ((request = (Message) in.readObject()) != null) {
                 System.out.println("[" + clientIp + "] -> " + request.getType());
                 Message response = route(request);
+                updateConnectionRegistry(request, response, clientIp);
                 out.writeObject(response);
                 out.flush();
                 System.out.println("[" + clientIp + "] <- " + response.getStatus());
@@ -45,6 +50,7 @@ public class ClientHandler implements Runnable {
         } catch (Exception e) {
             System.err.println("Erreur avec " + clientIp + " : " + e.getMessage());
         } finally {
+            ConnectedClientRegistry.unregisterUser(currentUserId);
             try {
                 socket.close();
             } catch (Exception ignored) {
@@ -64,6 +70,9 @@ public class ClientHandler implements Runnable {
                  Protocol.RESET_PASSWORD,
                  Protocol.UPDATE_PROFILE,
                  Protocol.UPDATE_NOTIFICATION_PREFERENCE,
+                 Protocol.REGISTER_UDP_PORT,
+                 Protocol.GET_NOTIFICATIONS,
+                 Protocol.MARK_NOTIFICATION_READ,
                  Protocol.DEACTIVATE_ACCOUNT,
                  Protocol.DELETE_ACCOUNT -> authHandler.handle(req);
 
@@ -116,5 +125,48 @@ public class ClientHandler implements Runnable {
 
             default -> Message.error("Type inconnu : " + req.getType());
         };
+    }
+
+    private void updateConnectionRegistry(Message request, Message response, String clientIp) {
+        if (response == null || response.isError()) {
+            return;
+        }
+        if (Protocol.LOGIN.equals(request.getType())) {
+            try {
+                JsonObject user = JsonParser.parseString(response.getPayload()).getAsJsonObject();
+                if (user != null) {
+                    int newUserId = user.get("id").getAsInt();
+                    if (currentUserId > 0 && currentUserId != newUserId) {
+                        ConnectedClientRegistry.unregisterUser(currentUserId);
+                    }
+                    currentUserId = newUserId;
+                    String role = user.has("role") && !user.get("role").isJsonNull()
+                            ? user.get("role").getAsString()
+                            : "";
+                    currentUserAdmin = "ADMIN".equalsIgnoreCase(role);
+                }
+            } catch (Exception e) {
+                System.err.println("ClientHandler.updateConnectionRegistry login : " + e.getMessage());
+            }
+            return;
+        }
+        if (Protocol.REGISTER_UDP_PORT.equals(request.getType())) {
+            try {
+                if (currentUserId <= 0) {
+                    System.err.println("ClientHandler.updateConnectionRegistry udp : utilisateur non authentifie");
+                    return;
+                }
+                int udpPort = Integer.parseInt(request.getPayload().trim());
+                ConnectedClientRegistry.registerUser(currentUserId, currentUserAdmin, clientIp, udpPort);
+            } catch (Exception e) {
+                System.err.println("ClientHandler.updateConnectionRegistry udp : " + e.getMessage());
+            }
+            return;
+        }
+        if (Protocol.LOGOUT.equals(request.getType())) {
+            ConnectedClientRegistry.unregisterUser(currentUserId);
+            currentUserId = 0;
+            currentUserAdmin = false;
+        }
     }
 }

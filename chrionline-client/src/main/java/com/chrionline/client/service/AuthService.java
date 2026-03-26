@@ -1,6 +1,7 @@
 package com.chrionline.client.service;
 
 import com.chrionline.client.model.UserDTO;
+import com.chrionline.client.network.UDPListener;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.util.JsonUtils;
 import com.chrionline.common.Message;
@@ -10,7 +11,12 @@ public class AuthService {
     private final TCPClient tcp = TCPClient.getInstance();
 
     public UserDTO login(String email, String mdp) throws Exception {
-        return JsonUtils.GSON.fromJson(send(Protocol.LOGIN, email + ":" + mdp).getPayload(), UserDTO.class);
+        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.LOGIN, email + ":" + mdp).getPayload(), UserDTO.class);
+        int udpPort = UDPListener.getBoundPort();
+        if (udpPort > 0) {
+            send(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
+        }
+        return user;
     }
 
     public String register(String nom, String prenom, String email, String mdp, String tel, String adresse, String dateNaissance) throws Exception {

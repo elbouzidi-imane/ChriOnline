@@ -12,6 +12,9 @@ public class Protocol {
     public static final String RESET_PASSWORD = "RESET_PASSWORD";
     public static final String UPDATE_PROFILE = "UPDATE_PROFILE";
     public static final String UPDATE_NOTIFICATION_PREFERENCE = "UPDATE_NOTIFICATION_PREFERENCE";
+    public static final String REGISTER_UDP_PORT = "REGISTER_UDP_PORT";
+    public static final String GET_NOTIFICATIONS = "GET_NOTIFICATIONS";
+    public static final String MARK_NOTIFICATION_READ = "MARK_NOTIFICATION_READ";
     public static final String DEACTIVATE_ACCOUNT = "DEACTIVATE_ACCOUNT";
     public static final String DELETE_ACCOUNT = "DELETE_ACCOUNT";
 

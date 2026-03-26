@@ -12,10 +12,12 @@ import com.chrionline.server.model.PromoUsageStat;
 import com.chrionline.server.model.Product;
 import com.chrionline.server.model.ProductSize;
 import com.chrionline.server.model.User;
+import com.chrionline.server.network.ConnectedClientRegistry;
 import com.chrionline.server.repository.CategoryDAO;
 import com.chrionline.server.repository.GuideDAO;
 import com.chrionline.server.repository.SizeDAO;
 import com.chrionline.server.service.CancellationConfigService;
+import com.chrionline.server.service.NotificationService;
 import com.chrionline.server.service.OrderService;
 import com.chrionline.server.service.PaymentService;
 import com.chrionline.server.service.PromoService;
@@ -36,6 +38,7 @@ public class AdminHandler {
     private final SizeDAO sizeDAO = new SizeDAO();
     private final CategoryDAO categoryDAO = new CategoryDAO();
     private final Gson gson = new Gson();
+    private final NotificationService notificationService = new NotificationService();
 
     public Message handle(Message request) {
         if (!isAdmin(request)) {
@@ -295,6 +298,7 @@ public class AdminHandler {
             if (!ok) {
                 return Message.error("Taille introuvable");
             }
+            notifyStockAlert(tailleId, newStock);
             return Message.ok(Protocol.ADMIN_UPDATE_STOCK, "Stock mis a jour : " + newStock);
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
@@ -316,6 +320,10 @@ public class AdminHandler {
             if (!ok) {
                 return Message.error("Utilisateur introuvable");
             }
+            notificationService.notifyClientAboutAdminAction(
+                    userId,
+                    "Votre compte a ete suspendu par l'administration."
+            );
             return Message.ok(Protocol.ADMIN_SUSPEND_USER, "Utilisateur suspendu");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
@@ -329,6 +337,10 @@ public class AdminHandler {
             if (!ok) {
                 return Message.error("Utilisateur introuvable");
             }
+            notificationService.notifyClientAboutAdminAction(
+                    userId,
+                    "Votre compte a ete reactive par l'administration."
+            );
             return Message.ok(Protocol.ADMIN_ACTIVATE_USER, "Utilisateur active");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
@@ -349,6 +361,10 @@ public class AdminHandler {
             if (!ok) {
                 return Message.error("Utilisateur introuvable");
             }
+            notificationService.notifyClientAboutAdminAction(
+                    user.getId(),
+                    "Vos informations de profil ont ete mises a jour par l'administration."
+            );
             return Message.ok(Protocol.ADMIN_UPDATE_USER, "Utilisateur mis a jour");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
@@ -543,6 +559,24 @@ public class AdminHandler {
             return Message.ok(Protocol.ADMIN_TOGGLE_PROMO, "Statut du code promo mis a jour");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private void notifyStockAlert(int tailleId, int newStock) {
+        if (newStock > 5) {
+            return;
+        }
+        for (Product product : productService.getAllProducts()) {
+            for (ProductSize size : product.getTailles()) {
+                if (size.getId() == tailleId) {
+                    String level = newStock == 0 ? "Rupture" : "Stock faible";
+                    notificationService.notifyAdmins(
+                            level + " sur " + product.getNom() + " (taille " + size.getValeur()
+                                    + ") : reste " + newStock + " unite(s)."
+                    );
+                    return;
+                }
+            }
         }
     }
 }

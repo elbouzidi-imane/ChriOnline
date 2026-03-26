@@ -132,6 +132,21 @@ public class UserDAO {
         return users;
     }
 
+    public List<Integer> findAdminIds() {
+        String sql = "SELECT id FROM utilisateur WHERE role = 'ADMIN' AND statut = 'ACTIF'";
+        List<Integer> ids = new ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                ids.add(rs.getInt("id"));
+            }
+        } catch (Exception e) {
+            System.err.println("UserDAO.findAdminIds : " + e.getMessage());
+        }
+        return ids;
+    }
+
     public boolean emailExists(String email) {
         String sql = "SELECT COUNT(*) FROM utilisateur WHERE email = ?";
         try (Connection conn = getConnection();

@@ -1,7 +1,10 @@
 package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.CategoryDTO;
+import com.chrionline.client.model.OrderDTO;
+import com.chrionline.client.model.OrderLineDTO;
 import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.service.OrderService;
 import com.chrionline.client.service.ProductService;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.ui.NavigationManager;
@@ -26,13 +29,19 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ProductListView extends VBox {
     private static final CategoryDTO ALL_CATEGORY = createAllCategory();
 
     private final ProductService productService = new ProductService();
+    private final OrderService orderService = new OrderService();
     private final List<ProductDTO> allProducts = new ArrayList<>();
+    private final VBox recommendationsSection = new VBox(14);
 
     public ProductListView() {
         setSpacing(20);
@@ -98,6 +107,9 @@ public class ProductListView extends VBox {
                 createInfoTile("Navigation simple", "Des cartes plus lisibles et des actions plus nettes."),
                 createInfoTile("Categories", "Un filtre direct pour isoler rapidement chaque univers."),
                 createInfoTile("Fiche produit", "Acces detaille avant ajout au panier."));
+
+        recommendationsSection.setVisible(false);
+        recommendationsSection.setManaged(false);
 
         ListView<ProductDTO> listView = new ListView<>();
         listView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent;");
@@ -208,7 +220,7 @@ public class ProductListView extends VBox {
                 List<ProductDTO> products = selected == null || selected.getId() == -1
                         ? allProducts
                         : productService.getByCategory(selected.getId());
-                listView.setItems(FXCollections.observableArrayList(products));
+                listView.setItems(FXCollections.observableArrayList(filterAvailable(products)));
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
             }
@@ -216,19 +228,117 @@ public class ProductListView extends VBox {
 
         try {
             allProducts.addAll(productService.getAll());
-            listView.setItems(FXCollections.observableArrayList(allProducts));
+            listView.setItems(FXCollections.observableArrayList(filterAvailable(allProducts)));
 
             List<CategoryDTO> categories = new ArrayList<>();
             categories.add(ALL_CATEGORY);
             categories.addAll(productService.getCategories());
             categoryBox.setItems(FXCollections.observableArrayList(categories));
             categoryBox.getSelectionModel().selectFirst();
+
+            buildRecommendations();
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
         }
 
-        getChildren().addAll(heading, toolbar, summaryRow, listView);
+        getChildren().addAll(heading, toolbar, summaryRow, recommendationsSection, listView);
         VBox.setVgrow(listView, Priority.ALWAYS);
+    }
+
+    private void buildRecommendations() {
+        if (!AppSession.isLoggedIn()) {
+            return;
+        }
+
+        try {
+            List<ProductDTO> recommendations = computeRecommendations();
+            if (recommendations.isEmpty()) {
+                return;
+            }
+
+            Label title = new Label("Pour vous");
+            title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+            Label subtitle = new Label("Suggestions basees sur vos categories deja commandees.");
+            subtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
+
+            HBox row = new HBox(16);
+            for (ProductDTO product : recommendations) {
+                row.getChildren().add(createRecommendationCard(product));
+            }
+
+            recommendationsSection.getChildren().setAll(title, subtitle, row);
+            recommendationsSection.setVisible(true);
+            recommendationsSection.setManaged(true);
+        } catch (Exception e) {
+            System.err.println("ProductListView.buildRecommendations : " + e.getMessage());
+        }
+    }
+
+    private List<ProductDTO> computeRecommendations() throws Exception {
+        Map<Integer, ProductDTO> productsById = allProducts.stream()
+                .collect(Collectors.toMap(ProductDTO::getId, product -> product, (left, right) -> left));
+
+        List<OrderDTO> orders = orderService.getOrders();
+        Map<Integer, Integer> categoryScores = new HashMap<>();
+        Map<Integer, Integer> purchasedProducts = new HashMap<>();
+
+        for (OrderDTO order : orders) {
+            for (OrderLineDTO line : order.getLignes()) {
+                ProductDTO orderedProduct = productsById.get(line.getProduitId());
+                if (orderedProduct == null) {
+                    continue;
+                }
+                purchasedProducts.merge(orderedProduct.getId(), line.getQuantite(), Integer::sum);
+                if (orderedProduct.getCategorie() != null) {
+                    categoryScores.merge(orderedProduct.getCategorie().getId(), line.getQuantite(), Integer::sum);
+                }
+            }
+        }
+
+        if (categoryScores.isEmpty()) {
+            return List.of();
+        }
+
+        return allProducts.stream()
+                .filter(ProductDTO::isDisponible)
+                .filter(product -> !purchasedProducts.containsKey(product.getId()))
+                .filter(product -> product.getCategorie() != null && categoryScores.containsKey(product.getCategorie().getId()))
+                .sorted(Comparator
+                        .comparingInt((ProductDTO product) -> categoryScores.getOrDefault(product.getCategorie().getId(), 0))
+                        .reversed()
+                        .thenComparing(Comparator.comparingInt((ProductDTO product) -> product.hasReduction() ? 1 : 0).reversed())
+                        .thenComparing(ProductDTO::getNom, String.CASE_INSENSITIVE_ORDER))
+                .limit(4)
+                .toList();
+    }
+
+    private HBox createRecommendationCard(ProductDTO product) {
+        Label category = new Label(product.getCategorie() == null ? "Selection" : product.getCategorie().getNom());
+        category.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #1f6f5f;");
+
+        Label name = new Label(product.getNom());
+        name.setWrapText(true);
+        name.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+        Label price = new Label(PriceUtils.formatMad(product.getPrixAffiche()));
+        price.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #cc6b1d;");
+
+        Button button = ViewFactory.createSecondaryButton("Voir");
+        button.setOnAction(event -> NavigationManager.navigateTo(new ProductDetailView(product)));
+
+        VBox content = new VBox(8, category, name, price, button);
+        content.setPadding(new Insets(18));
+        content.setPrefWidth(220);
+        content.setStyle(ViewFactory.elevatedCardStyle());
+
+        return new HBox(content);
+    }
+
+    private List<ProductDTO> filterAvailable(List<ProductDTO> products) {
+        return products.stream()
+                .filter(ProductDTO::isDisponible)
+                .collect(Collectors.toList());
     }
 
     private VBox createInfoTile(String title, String text) {

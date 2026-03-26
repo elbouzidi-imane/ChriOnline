@@ -1,5 +1,6 @@
 package com.chrionline.client.util;
 
+import com.chrionline.client.ui.NavigationManager;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DialogPane;
@@ -9,15 +10,15 @@ public final class UIUtils {
     }
 
     public static void showInfo(String message) {
-        showStyledAlert(Alert.AlertType.INFORMATION, "Information", message, false);
+        showStyledMessage(Alert.AlertType.INFORMATION, "Information", message, false);
     }
 
     public static void showSuccess(String message) {
-        showStyledAlert(Alert.AlertType.INFORMATION, "Confirmation", message, false);
+        showStyledMessage(Alert.AlertType.INFORMATION, "Confirmation", message, false);
     }
 
     public static void showError(String message) {
-        showStyledAlert(Alert.AlertType.ERROR, "Erreur", message, true);
+        showStyledMessage(Alert.AlertType.ERROR, "Erreur", message, true);
     }
 
     public static boolean confirm(String title, String message) {
@@ -25,13 +26,12 @@ public final class UIUtils {
         return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
     }
 
-    private static void showStyledAlert(Alert.AlertType type, String title, String message, boolean wait) {
-        Alert alert = createAlert(type, title, message);
-        if (wait) {
-            alert.showAndWait();
-        } else {
-            alert.show();
+    private static void showStyledMessage(Alert.AlertType type, String title, String message, boolean error) {
+        if (NavigationManager.isReady()) {
+            NavigationManager.showNotification(title, message, error);
+            return;
         }
+        createAlert(type, title, message).show();
     }
 
     private static Alert createAlert(Alert.AlertType type, String title, String message) {

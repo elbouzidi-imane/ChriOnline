@@ -20,6 +20,14 @@ CREATE TABLE utilisateur (
                              notifications_activees BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE notification (
+                              id SERIAL PRIMARY KEY,
+                              utilisateur_id INT NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+                              message TEXT NOT NULL,
+                              lue BOOLEAN NOT NULL DEFAULT FALSE,
+                              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Categorie
 CREATE TABLE categorie (
                            id          SERIAL PRIMARY KEY,
