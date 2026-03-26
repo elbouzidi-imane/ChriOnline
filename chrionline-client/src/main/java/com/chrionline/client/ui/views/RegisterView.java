@@ -152,7 +152,7 @@ public class RegisterView extends ScrollPane {
         Button registerButton = ViewFactory.createPrimaryButton("S'inscrire");
         registerButton.setMaxWidth(Double.MAX_VALUE);
         registerButton.setOnAction(event -> {
-            String email = emailField.getText().trim();
+            String email = normalizeEmail(emailField.getText());
             String password = passwordControl.getValue();
             String confirmation = confirmControl.getValue();
 
@@ -165,7 +165,7 @@ public class RegisterView extends ScrollPane {
                 UIUtils.showError("La confirmation du mot de passe ne correspond pas.");
                 return;
             }
-            if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            if (!isValidEmail(email)) {
                 UIUtils.showError("Format d'email invalide.");
                 return;
             }
@@ -295,6 +295,38 @@ public class RegisterView extends ScrollPane {
                 .findFirst()
                 .orElse(1);
         return String.format("%04d-%02d-%02d", year, month, day);
+    }
+
+    private String normalizeEmail(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\u00A0", "")
+                .replace("\u2007", "")
+                .replace("\u202F", "")
+                .replace("\u200B", "")
+                .replace("\u200C", "")
+                .replace("\u200D", "")
+                .replace("\uFEFF", "")
+                .trim();
+    }
+
+    private boolean isValidEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        if (email.contains(" ")) {
+            return false;
+        }
+        int atIndex = email.indexOf('@');
+        int lastAtIndex = email.lastIndexOf('@');
+        if (atIndex <= 0 || atIndex != lastAtIndex || atIndex == email.length() - 1) {
+            return false;
+        }
+        String domain = email.substring(atIndex + 1);
+        int dotIndex = domain.indexOf('.');
+        return dotIndex > 0 && dotIndex < domain.length() - 1;
     }
 
     private static Map<String, List<String>> createRegionCities() {
