@@ -13,6 +13,7 @@ public class UserDTO {
     private String statut;
     private Date dateInscription;
     private Date dateNaissance;
+    private boolean notificationsActivees;
 
     public int getId() {
         return id;
@@ -52,6 +53,14 @@ public class UserDTO {
 
     public Date getDateNaissance() {
         return dateNaissance;
+    }
+
+    public boolean isNotificationsActivees() {
+        return notificationsActivees;
+    }
+
+    public void setNotificationsActivees(boolean notificationsActivees) {
+        this.notificationsActivees = notificationsActivees;
     }
 
     public boolean isAdmin() {

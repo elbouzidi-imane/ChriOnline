@@ -50,6 +50,10 @@ public class AuthService {
         return send(Protocol.UPDATE_PROFILE, payload).getPayload();
     }
 
+    public String updateNotificationPreference(int userId, boolean enabled) throws Exception {
+        return send(Protocol.UPDATE_NOTIFICATION_PREFERENCE, userId + "|" + enabled).getPayload();
+    }
+
     public String deactivateAccount(int userId) throws Exception {
         return send(Protocol.DEACTIVATE_ACCOUNT, String.valueOf(userId)).getPayload();
     }

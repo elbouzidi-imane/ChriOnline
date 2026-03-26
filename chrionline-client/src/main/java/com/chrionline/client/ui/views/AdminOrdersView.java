@@ -246,8 +246,16 @@ public class AdminOrdersView extends VBox {
 
         if (dialog.showAndWait().filter(ButtonType.OK::equals).isPresent()) {
             try {
+                if (statusBox.getValue() == null || statusBox.getValue().isBlank()) {
+                    UIUtils.showError("Selectionnez un statut.");
+                    return;
+                }
+                if (statusBox.getValue().equals(selected.getStatut())) {
+                    UIUtils.showInfo("Le statut choisi est identique au statut actuel.");
+                    return;
+                }
                 adminService.updateOrderStatus(selected.getId(), statusBox.getValue());
-                UIUtils.showSuccess("Statut mis a jour.");
+                UIUtils.showSuccess("Statut mis a jour. Un email sera envoye si le client a active les notifications.");
                 loadOrders();
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());

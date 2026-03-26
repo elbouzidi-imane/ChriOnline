@@ -3,7 +3,10 @@ package com.chrionline.server.repository;
 import com.chrionline.server.db.DatabaseManager;
 import com.chrionline.server.model.User;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,7 +16,6 @@ public class UserDAO {
         return DatabaseManager.getInstance().getConnection();
     }
 
-    // ── Trouver un utilisateur par email ─────────────
     public User findByEmail(String email) {
         String sql = "SELECT * FROM utilisateur WHERE email = ?";
         try (Connection conn = getConnection();
@@ -27,7 +29,6 @@ public class UserDAO {
         return null;
     }
 
-    // ── Trouver un utilisateur par id ────────────────
     public User findById(int id) {
         String sql = "SELECT * FROM utilisateur WHERE id = ?";
         try (Connection conn = getConnection();
@@ -41,13 +42,12 @@ public class UserDAO {
         return null;
     }
 
-    // ── Enregistrer un nouvel utilisateur ────────────
     public User save(User user) {
         String sql = """
             INSERT INTO utilisateur
-                (nom, prenom, email, mot_de_passe, telephone, adresse, role, statut)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, date_inscription
+                (nom, prenom, email, mot_de_passe, telephone, adresse, role, statut, notifications_activees)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, date_inscription, notifications_activees
             """;
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -59,10 +59,12 @@ public class UserDAO {
             ps.setString(6, user.getAdresse());
             ps.setString(7, user.getRole());
             ps.setString(8, user.getStatut());
+            ps.setBoolean(9, user.isNotificationsActivees());
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 user.setId(rs.getInt("id"));
                 user.setDateInscription(rs.getDate("date_inscription"));
+                user.setNotificationsActivees(rs.getBoolean("notifications_activees"));
             }
             return user;
         } catch (Exception e) {
@@ -71,7 +73,6 @@ public class UserDAO {
         }
     }
 
-    // ── Mettre à jour le statut ───────────────────────
     public boolean updateStatut(int id, String statut) {
         String sql = "UPDATE utilisateur SET statut = ? WHERE id = ?";
         try (Connection conn = getConnection();
@@ -85,7 +86,6 @@ public class UserDAO {
         }
     }
 
-    // ── Mettre à jour le profil ───────────────────────
     public boolean updateProfil(User user) {
         String sql = """
             UPDATE utilisateur
@@ -106,7 +106,6 @@ public class UserDAO {
         }
     }
 
-    // ── Mettre à jour le mot de passe ─────────────────
     public boolean updatePassword(int id, String newHashedPassword) {
         String sql = "UPDATE utilisateur SET mot_de_passe = ? WHERE id = ?";
         try (Connection conn = getConnection();
@@ -120,7 +119,6 @@ public class UserDAO {
         }
     }
 
-    // ── Tous les utilisateurs (admin) ─────────────────
     public List<User> findAll() {
         String sql = "SELECT * FROM utilisateur ORDER BY date_inscription DESC";
         List<User> users = new ArrayList<>();
@@ -134,7 +132,6 @@ public class UserDAO {
         return users;
     }
 
-    // ── Vérifier si un email existe déjà ─────────────
     public boolean emailExists(String email) {
         String sql = "SELECT COUNT(*) FROM utilisateur WHERE email = ?";
         try (Connection conn = getConnection();
@@ -147,7 +144,7 @@ public class UserDAO {
         }
         return false;
     }
-    // ── Mettre à jour date_naissance ──────────────────
+
     public boolean updateDateNaissance(int id, java.sql.Date dateNaissance) {
         String sql = "UPDATE utilisateur SET date_naissance=? WHERE id=?";
         try (Connection conn = getConnection();
@@ -161,7 +158,19 @@ public class UserDAO {
         }
     }
 
-    // ── Supprimer définitivement un compte ────────────
+    public boolean updateNotificationPreference(int id, boolean notificationsActivees) {
+        String sql = "UPDATE utilisateur SET notifications_activees=? WHERE id=?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBoolean(1, notificationsActivees);
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("UserDAO.updateNotificationPreference : " + e.getMessage());
+            return false;
+        }
+    }
+
     public boolean delete(int id) {
         String sql = "DELETE FROM utilisateur WHERE id=?";
         try (Connection conn = getConnection();
@@ -174,7 +183,6 @@ public class UserDAO {
         }
     }
 
-    // ── Mapper un ResultSet → User ────────────────────
     private User mapRow(ResultSet rs) throws SQLException {
         User u = new User();
         u.setId(rs.getInt("id"));
@@ -188,6 +196,7 @@ public class UserDAO {
         u.setStatut(rs.getString("statut"));
         u.setDateInscription(rs.getDate("date_inscription"));
         u.setDateNaissance(rs.getDate("date_naissance"));
+        u.setNotificationsActivees(rs.getBoolean("notifications_activees"));
         return u;
     }
 }

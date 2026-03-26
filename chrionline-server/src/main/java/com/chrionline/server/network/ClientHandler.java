@@ -2,21 +2,25 @@ package com.chrionline.server.network;
 
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
-import com.chrionline.server.handler.*;
+import com.chrionline.server.handler.AdminHandler;
+import com.chrionline.server.handler.AuthHandler;
+import com.chrionline.server.handler.CartHandler;
+import com.chrionline.server.handler.OrderHandler;
+import com.chrionline.server.handler.ProductHandler;
 
-import java.io.*;
+import java.io.EOFException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable {
 
     private final Socket socket;
-
-    // ── Handlers (un par domaine) ─────────────────────
-    private final AuthHandler    authHandler    = new AuthHandler();
+    private final AuthHandler authHandler = new AuthHandler();
     private final ProductHandler productHandler = new ProductHandler();
-    private final CartHandler    cartHandler    = new CartHandler();
-    private final OrderHandler   orderHandler   = new OrderHandler();
-    private final AdminHandler   adminHandler   = new AdminHandler();
+    private final CartHandler cartHandler = new CartHandler();
+    private final OrderHandler orderHandler = new OrderHandler();
+    private final AdminHandler adminHandler = new AdminHandler();
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -26,50 +30,53 @@ public class ClientHandler implements Runnable {
     public void run() {
         String clientIp = socket.getInetAddress().getHostAddress();
 
-        try (
-                // IMPORTANT : ObjectOutputStream AVANT ObjectInputStream
-                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                ObjectInputStream  in  = new ObjectInputStream(socket.getInputStream())
-        ) {
+        try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+             ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
             Message request;
             while ((request = (Message) in.readObject()) != null) {
-                System.out.println("[" + clientIp + "] → " + request.getType());
+                System.out.println("[" + clientIp + "] -> " + request.getType());
                 Message response = route(request);
                 out.writeObject(response);
                 out.flush();
-                System.out.println("[" + clientIp + "] ← " + response.getStatus());
+                System.out.println("[" + clientIp + "] <- " + response.getStatus());
             }
-
         } catch (EOFException e) {
-            System.out.println("Client déconnecté : " + clientIp);
+            System.out.println("Client deconnecte : " + clientIp);
         } catch (Exception e) {
             System.err.println("Erreur avec " + clientIp + " : " + e.getMessage());
         } finally {
-            try { socket.close(); } catch (Exception ignored) {}
+            try {
+                socket.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 
-    // ── Routeur — dirige vers le bon handler ──────────
     private Message route(Message req) {
         return switch (req.getType()) {
-
             case Protocol.LOGIN,
                  Protocol.REGISTER,
-                 Protocol.LOGOUT
-                    -> authHandler.handle(req);
+                 Protocol.LOGOUT,
+                 Protocol.VERIFY_EMAIL,
+                 Protocol.RESEND_OTP,
+                 Protocol.FORGOT_PASSWORD,
+                 Protocol.VERIFY_RESET_OTP,
+                 Protocol.RESET_PASSWORD,
+                 Protocol.UPDATE_PROFILE,
+                 Protocol.UPDATE_NOTIFICATION_PREFERENCE,
+                 Protocol.DEACTIVATE_ACCOUNT,
+                 Protocol.DELETE_ACCOUNT -> authHandler.handle(req);
 
             case Protocol.GET_PRODUCTS,
                  Protocol.GET_PRODUCT,
                  Protocol.GET_CATEGORIES,
-                 Protocol.GET_PRODUCTS_BY_CATEGORIE
-                    -> productHandler.handle(req);
+                 Protocol.GET_PRODUCTS_BY_CATEGORIE -> productHandler.handle(req);
 
             case Protocol.GET_CART,
                  Protocol.ADD_TO_CART,
                  Protocol.REMOVE_FROM_CART,
                  Protocol.UPDATE_CART,
-                 Protocol.CLEAR_CART
-                    -> cartHandler.handle(req);
+                 Protocol.CLEAR_CART -> cartHandler.handle(req);
 
             case Protocol.PLACE_ORDER,
                  Protocol.GET_ORDERS,
@@ -77,8 +84,7 @@ public class ClientHandler implements Runnable {
                  Protocol.CANCEL_ORDER,
                  Protocol.GET_CANCELLATION_CONFIG,
                  Protocol.APPLY_PROMO,
-                 Protocol.PAY
-                    -> orderHandler.handle(req);
+                 Protocol.PAY -> orderHandler.handle(req);
 
             case Protocol.ADMIN_ADD_PRODUCT,
                  Protocol.ADMIN_UPDATE_PRODUCT,
@@ -106,17 +112,7 @@ public class ClientHandler implements Runnable {
                  Protocol.ADMIN_ADD_PROMO,
                  Protocol.ADMIN_GET_PROMOS,
                  Protocol.ADMIN_GET_PROMO_STATS,
-                 Protocol.ADMIN_TOGGLE_PROMO
-                    -> adminHandler.handle(req);
-            case Protocol.VERIFY_EMAIL,
-                 Protocol.RESEND_OTP,
-                 Protocol.FORGOT_PASSWORD,
-                 Protocol.VERIFY_RESET_OTP,
-                 Protocol.RESET_PASSWORD,
-                 Protocol.UPDATE_PROFILE,
-                 Protocol.DEACTIVATE_ACCOUNT,
-                 Protocol.DELETE_ACCOUNT
-                    -> authHandler.handle(req);
+                 Protocol.ADMIN_TOGGLE_PROMO -> adminHandler.handle(req);
 
             default -> Message.error("Type inconnu : " + req.getType());
         };

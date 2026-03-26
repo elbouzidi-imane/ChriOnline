@@ -1,26 +1,41 @@
 package com.chrionline.server.service;
 
-import com.chrionline.server.model.*;
-import com.chrionline.server.repository.*;
+import com.chrionline.server.model.CancellationConfig;
+import com.chrionline.server.model.CancellationResult;
+import com.chrionline.server.model.Cart;
+import com.chrionline.server.model.CartLine;
+import com.chrionline.server.model.Livraison;
+import com.chrionline.server.model.Order;
+import com.chrionline.server.model.OrderLine;
+import com.chrionline.server.model.Payment;
+import com.chrionline.server.model.Product;
+import com.chrionline.server.model.ProductSize;
+import com.chrionline.server.model.PromoValidationResult;
+import com.chrionline.server.model.User;
+import com.chrionline.server.repository.CartDAO;
+import com.chrionline.server.repository.LivraisonDAO;
+import com.chrionline.server.repository.OrderDAO;
+import com.chrionline.server.repository.PaymentDAO;
+import com.chrionline.server.repository.ProductDAO;
+import com.chrionline.server.repository.UserDAO;
 
 import java.time.LocalDate;
 import java.util.List;
 
 public class OrderService {
 
-    private final OrderDAO     orderDAO     = new OrderDAO();
-    private final CartDAO      cartDAO      = new CartDAO();
-    private final ProductDAO   productDAO   = new ProductDAO();
-    private final PaymentDAO   paymentDAO   = new PaymentDAO();
+    private final OrderDAO orderDAO = new OrderDAO();
+    private final CartDAO cartDAO = new CartDAO();
+    private final ProductDAO productDAO = new ProductDAO();
+    private final PaymentDAO paymentDAO = new PaymentDAO();
     private final PaymentService paymentService = new PaymentService();
     private final LivraisonDAO livraisonDAO = new LivraisonDAO();
     private final PromoService promoService = new PromoService();
+    private final UserDAO userDAO = new UserDAO();
+    private final EmailService emailService = EmailService.getInstance();
 
-    // ── Valider une commande ──────────────────────────
     public Order validerCommande(int userId, String adresse,
                                  String modePaiement, String modeLivraison, String promoCode) {
-
-        // 1. Récupérer le panier
         Cart cart = cartDAO.getOrCreateCart(userId);
         if (cart == null || cart.isEmpty()) {
             System.out.println("OrderService : panier vide pour userId=" + userId);
@@ -28,8 +43,6 @@ public class OrderService {
         }
 
         List<CartLine> lignes = cart.getLignes();
-
-        // 2. Vérifier le stock pour chaque ligne
         for (CartLine ligne : lignes) {
             Product product = productDAO.findById(ligne.getProduitId());
             if (product == null) return null;
@@ -38,8 +51,7 @@ public class OrderService {
             for (ProductSize taille : product.getTailles()) {
                 if (taille.getId() == ligne.getTailleId()) {
                     if (taille.getStock() < ligne.getQuantite()) {
-                        System.out.println("OrderService : stock insuffisant pour taille "
-                                + taille.getValeur());
+                        System.out.println("OrderService : stock insuffisant pour taille " + taille.getValeur());
                         return null;
                     }
                     stockOk = true;
@@ -49,7 +61,6 @@ public class OrderService {
             if (!stockOk) return null;
         }
 
-        // 3. Calculer le total
         double originalTotal = cart.getTotal();
         double total = originalTotal;
         double discountAmount = 0;
@@ -63,19 +74,15 @@ public class OrderService {
             discountAmount = promoResult.getDiscountAmount();
         }
 
-        // 4. Créer la commande avec référence temporaire
         Order order = new Order(userId, total, adresse);
         order.setReference("TEMP-" + System.currentTimeMillis());
         order = orderDAO.save(order);
         if (order == null) return null;
 
-        // 5. Générer la vraie référence avec l'id BDD
-        String reference = String.format("CMD-%d-%05d",
-                LocalDate.now().getYear(), order.getId());
+        String reference = String.format("CMD-%d-%05d", LocalDate.now().getYear(), order.getId());
         order.setReference(reference);
         updateReference(order.getId(), reference);
 
-        // 6. Créer les lignes commande + décrémenter le stock
         for (CartLine ligne : lignes) {
             OrderLine orderLine = new OrderLine(
                     order.getId(),
@@ -86,7 +93,6 @@ public class OrderService {
             );
             orderDAO.saveOrderLine(orderLine);
 
-            // Décrémenter le stock
             Product product = productDAO.findById(ligne.getProduitId());
             for (ProductSize taille : product.getTailles()) {
                 if (taille.getId() == ligne.getTailleId()) {
@@ -97,20 +103,16 @@ public class OrderService {
             }
         }
 
-        // 7. Simuler le paiement
         Payment payment = new Payment(order.getId(), total, modePaiement);
         payment.setStatut("VALIDE");
         payment.setReference("TXN-" + System.currentTimeMillis());
         paymentDAO.save(payment);
 
-        // 8. Créer la livraison
         Livraison livraison = new Livraison(order.getId(), modeLivraison);
         livraisonDAO.save(livraison);
 
-        // 9. Vider le panier
         cartDAO.clearCart(cart.getId());
 
-        // 10. Mettre à jour le statut → VALIDEE
         orderDAO.updateStatut(order.getId(), "VALIDEE");
         order.setStatut("VALIDEE");
 
@@ -118,27 +120,46 @@ public class OrderService {
             promoService.registerUsage(normalizedPromoCode, userId, order.getId(), discountAmount);
         }
 
+        sendConfirmationEmail(order);
         return order;
     }
 
-    // ── Commandes d'un utilisateur ────────────────────
     public List<Order> getOrdersByUser(int userId) {
         return orderDAO.findByUser(userId);
     }
 
-    // ── Commande par id ───────────────────────────────
     public Order getOrderById(int id) {
         return orderDAO.findById(id);
     }
 
-    // ── Toutes les commandes (admin) ──────────────────
     public List<Order> getAllOrders() {
         return orderDAO.findAll();
     }
 
-    // ── Changer le statut (admin) ─────────────────────
     public boolean updateStatut(int id, String statut) {
-        return orderDAO.updateStatut(id, statut);
+        Order order = orderDAO.findById(id);
+        if (order == null) {
+            System.err.println("OrderService.updateStatut : commande introuvable id=" + id);
+            return false;
+        }
+
+        String currentStatus = order.getStatut();
+        if (statut == null || statut.isBlank()) {
+            System.err.println("OrderService.updateStatut : statut vide pour commande=" + id);
+            return false;
+        }
+        if (statut.equals(currentStatus)) {
+            System.out.println("OrderService.updateStatut : aucun changement pour commande=" + id + " statut=" + statut);
+            return true;
+        }
+        boolean updated = orderDAO.updateStatut(id, statut);
+        if (!updated) {
+            System.err.println("OrderService.updateStatut : echec maj statut commande=" + id + " vers " + statut);
+            return false;
+        }
+
+        sendStatusEmail(order.getUtilisateurId(), order.getReference(), statut);
+        return true;
     }
 
     public CancellationConfig getCancellationConfig() {
@@ -198,12 +219,42 @@ public class OrderService {
         );
     }
 
-    // ── Mettre à jour la référence en BDD ─────────────
+    private void sendConfirmationEmail(Order order) {
+        User user = userDAO.findById(order.getUtilisateurId());
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            System.err.println("OrderService.sendConfirmationEmail : utilisateur ou email introuvable pour commande=" + order.getId());
+            return;
+        }
+        String firstName = user.getPrenom() == null || user.getPrenom().isBlank() ? "client" : user.getPrenom();
+        boolean sent = emailService.sendOrderConfirmationEmail(
+                user.getEmail(),
+                firstName,
+                order.getReference(),
+                order.getMontantTotal(),
+                user.isNotificationsActivees()
+        );
+        System.out.println("OrderService.sendConfirmationEmail : commande=" + order.getReference() + " envoye=" + sent);
+    }
+
+    private void sendStatusEmail(int userId, String reference, String statut) {
+        User user = userDAO.findById(userId);
+        if (user == null || !user.isNotificationsActivees()) {
+            System.out.println("OrderService.sendStatusEmail : notifications desactivees ou utilisateur introuvable userId=" + userId);
+            return;
+        }
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            System.err.println("OrderService.sendStatusEmail : email vide userId=" + userId);
+            return;
+        }
+        String firstName = user.getPrenom() == null || user.getPrenom().isBlank() ? "client" : user.getPrenom();
+        boolean sent = emailService.sendOrderStatusEmail(user.getEmail(), firstName, reference, statut);
+        System.out.println("OrderService.sendStatusEmail : reference=" + reference + " statut=" + statut + " envoye=" + sent);
+    }
+
     private void updateReference(int orderId, String reference) {
         String sql = "UPDATE commande SET reference = ? WHERE id = ?";
         try (java.sql.Connection conn =
-                     com.chrionline.server.db.DatabaseManager
-                             .getInstance().getConnection();
+                     com.chrionline.server.db.DatabaseManager.getInstance().getConnection();
              java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, reference);
             ps.setInt(2, orderId);

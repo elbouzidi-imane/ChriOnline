@@ -3,6 +3,7 @@ package com.chrionline.client.ui.views;
 import com.chrionline.client.model.CartDTO;
 import com.chrionline.client.model.CartLineDTO;
 import com.chrionline.client.model.PromoValidationResultDTO;
+import com.chrionline.client.service.AuthService;
 import com.chrionline.client.service.CartService;
 import com.chrionline.client.service.OrderService;
 import com.chrionline.client.session.AppSession;
@@ -14,6 +15,7 @@ import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
@@ -39,6 +41,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class CheckoutView extends ScrollPane {
+    private final AuthService authService = new AuthService();
     private final CartService cartService = new CartService();
     private final OrderService orderService = new OrderService();
     private PromoValidationResultDTO appliedPromo;
@@ -112,6 +115,8 @@ public class CheckoutView extends ScrollPane {
 
         TextField addressField = createField("Adresse de livraison");
         TextField promoField = createField("Code promo");
+        CheckBox notificationsBox = new CheckBox("Recevoir des emails de suivi de commande");
+        notificationsBox.setSelected(AppSession.isLoggedIn() && AppSession.getCurrentUser().isNotificationsActivees());
         if (AppSession.isLoggedIn() && AppSession.getCurrentUser().getAdresse() != null) {
             addressField.setText(AppSession.getCurrentUser().getAdresse());
         }
@@ -207,6 +212,11 @@ public class CheckoutView extends ScrollPane {
             }
 
             try {
+                authService.updateNotificationPreference(
+                        AppSession.getCurrentUser().getId(),
+                        notificationsBox.isSelected()
+                );
+                AppSession.getCurrentUser().setNotificationsActivees(notificationsBox.isSelected());
                 String reference = orderService.placeOrder(
                         addressField.getText().trim(),
                         paymentBox.getValue(),
@@ -227,6 +237,7 @@ public class CheckoutView extends ScrollPane {
                 new Label("Code promo"),
                 createPromoRow(promoField),
                 promoFeedbackLabel,
+                notificationsBox,
                 new Separator(),
                 new Label("Mode de paiement"), paymentBox,
                 paymentDetailsBox,

@@ -15,7 +15,9 @@ CREATE TABLE utilisateur (
                                  CHECK (role IN ('CLIENT', 'ADMIN')),
                              statut           VARCHAR(20) NOT NULL DEFAULT 'ACTIF'
                                  CHECK (statut IN ('ACTIF', 'SUSPENDU')),
-                             date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                             date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                             date_naissance   DATE,
+                             notifications_activees BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 -- Categorie

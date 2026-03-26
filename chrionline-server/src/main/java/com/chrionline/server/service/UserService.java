@@ -205,6 +205,10 @@ public class UserService {
         return ok;
     }
 
+    public boolean updateNotificationPreference(int id, boolean notificationsActivees) {
+        return userDAO.updateNotificationPreference(id, notificationsActivees);
+    }
+
     // ── Désactiver le compte (soft delete) ────────────
     public boolean deactivateAccount(int id) {
         return userDAO.updateStatut(id, "SUSPENDU");

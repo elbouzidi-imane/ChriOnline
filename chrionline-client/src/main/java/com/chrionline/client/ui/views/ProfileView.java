@@ -6,6 +6,7 @@ import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
@@ -42,6 +43,8 @@ public class ProfileView extends VBox {
                 ? ""
                 : new SimpleDateFormat("yyyy-MM-dd").format(AppSession.getCurrentUser().getDateNaissance());
         TextField birthField = createField("Date de naissance (YYYY-MM-DD)", dateNaissance);
+        CheckBox notificationsBox = new CheckBox("Recevoir un email quand le statut de mes commandes change");
+        notificationsBox.setSelected(AppSession.getCurrentUser().isNotificationsActivees());
 
         Button updateButton = ViewFactory.createPrimaryButton("Mettre a jour");
         updateButton.setOnAction(event -> {
@@ -54,6 +57,11 @@ public class ProfileView extends VBox {
                         adresseField.getText().trim(),
                         birthField.getText().trim()
                 ));
+                authService.updateNotificationPreference(
+                        AppSession.getCurrentUser().getId(),
+                        notificationsBox.isSelected()
+                );
+                AppSession.getCurrentUser().setNotificationsActivees(notificationsBox.isSelected());
                 UIUtils.showInfo("Reconnectez-vous pour rafraichir les donnees locales du profil.");
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
@@ -92,7 +100,7 @@ public class ProfileView extends VBox {
 
         VBox card = new VBox(12,
                 new Label("Informations personnelles"),
-                nomField, prenomField, telephoneField, adresseField, birthField, actions);
+                nomField, prenomField, telephoneField, adresseField, birthField, notificationsBox, actions);
         card.setPadding(new Insets(18));
         card.setStyle(ViewFactory.cardStyle());
 
