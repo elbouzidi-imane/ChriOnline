@@ -40,45 +40,58 @@ public class RegisterView extends ScrollPane {
 
     public RegisterView() {
         HBox root = new HBox();
-        root.setStyle("-fx-background-color: linear-gradient(to right, #fff6e7, #ffe2be);");
+        root.setStyle("-fx-background-color: linear-gradient(to right, #efe2d0, #f6eee6);");
 
         setFitToWidth(true);
         setHbarPolicy(ScrollBarPolicy.NEVER);
         setVbarPolicy(ScrollBarPolicy.AS_NEEDED);
-        setStyle("-fx-background: #fff6e7; -fx-background-color: #fff6e7;");
+        setStyle("-fx-background: #efe2d0; -fx-background-color: #efe2d0;");
         setContent(root);
 
-        VBox intro = new VBox(16);
-        intro.setPadding(new Insets(42));
+        VBox intro = new VBox(18);
+        intro.setPadding(new Insets(44));
         intro.setAlignment(Pos.CENTER_LEFT);
-        intro.setPrefWidth(360);
-        intro.setStyle("-fx-background-color: linear-gradient(to bottom, #165c4f, #1f7a63);");
+        intro.setPrefWidth(380);
+        intro.setStyle("-fx-background-color: linear-gradient(to bottom, #1a5a4d, #0f352e);");
 
         Label brand = new Label("ChriOnline");
-        brand.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: white;");
-        Label headline = new Label("Creez votre espace client mode.");
+        brand.setStyle("-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: white;");
+        Label overline = new Label("INSCRIPTION");
+        overline.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-letter-spacing: 2px; -fx-text-fill: #f2d9bd;");
+        Label headline = new Label("Creez un compte qui vous suit du catalogue jusqu'a la livraison.");
         headline.setWrapText(true);
-        headline.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #fff7ed;");
-        Label text = new Label("Inscrivez-vous, confirmez votre email avec le code OTP puis profitez du catalogue, du panier et des commandes.");
+        headline.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #fff7ed;");
+        Label text = new Label("L'inscription a ete repensee pour etre plus claire, plus chic et plus simple a completer.");
         text.setWrapText(true);
-        text.setStyle("-fx-font-size: 14px; -fx-text-fill: #dff5ef;");
+        text.setStyle("-fx-font-size: 14px; -fx-text-fill: #d9efe6;");
+
+        VBox bullets = new VBox(10,
+                createIntroPoint("Verification OTP par email"),
+                createIntroPoint("Adresse structuree par region et ville"),
+                createIntroPoint("Acces direct au panier, profil et commandes"));
 
         Button loginIntroButton = ViewFactory.createSecondaryButton("J'ai deja un compte");
         loginIntroButton.setOnAction(event -> NavigationManager.navigateTo(new LoginView()));
 
-        intro.getChildren().addAll(brand, headline, text, loginIntroButton);
+        intro.getChildren().addAll(brand, overline, headline, text, bullets, loginIntroButton);
+
+        VBox formWrap = new VBox();
+        formWrap.setPadding(new Insets(34));
+        formWrap.setAlignment(Pos.TOP_CENTER);
+        formWrap.setStyle("-fx-background-color: linear-gradient(to bottom, #f8f1e8, #f4ece2);");
+        HBox.setHgrow(formWrap, Priority.ALWAYS);
 
         VBox form = new VBox(12);
-        form.setPadding(new Insets(34));
-        form.setAlignment(Pos.CENTER_LEFT);
-        form.setStyle("-fx-background-color: #fffaf5;");
-        HBox.setHgrow(form, Priority.ALWAYS);
+        form.setMaxWidth(520);
+        form.setPadding(new Insets(30));
+        form.setStyle(ViewFactory.elevatedCardStyle());
 
         Label title = new Label("Creer un compte");
-        title.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #162521;");
+        title.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #162521;");
 
-        Label subtitle = new Label("Renseignez vos informations puis confirmez votre email.");
+        Label subtitle = new Label("Renseignez vos informations puis confirmez votre email pour activer le compte.");
         subtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");
+        subtitle.setWrapText(true);
 
         TextField nomField = createField("Nom");
         TextField prenomField = createField("Prenom");
@@ -106,7 +119,7 @@ public class RegisterView extends ScrollPane {
         styleCombo(yearBox);
 
         HBox birthRow = new HBox(10, dayBox, monthBox, yearBox);
-        birthRow.setMaxWidth(420);
+        birthRow.setMaxWidth(Double.MAX_VALUE);
 
         ComboBox<String> regionBox = new ComboBox<>(FXCollections.observableArrayList(REGION_CITIES.keySet()));
         regionBox.setPromptText("Region");
@@ -126,7 +139,7 @@ public class RegisterView extends ScrollPane {
         GridPane locationRow = new GridPane();
         locationRow.setHgap(10);
         locationRow.setVgap(8);
-        locationRow.setMaxWidth(420);
+        locationRow.setMaxWidth(Double.MAX_VALUE);
         locationRow.add(new Label("Region"), 0, 0);
         locationRow.add(new Label("Ville"), 1, 0);
         locationRow.add(regionBox, 0, 1);
@@ -189,6 +202,7 @@ public class RegisterView extends ScrollPane {
         loginButton.setOnAction(event -> NavigationManager.navigateTo(new LoginView()));
 
         Hyperlink homeLink = new Hyperlink("Retour a l'accueil");
+        homeLink.setStyle("-fx-text-fill: #1d5f52; -fx-font-size: 13px;");
         homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
 
         form.getChildren().addAll(
@@ -202,7 +216,15 @@ public class RegisterView extends ScrollPane {
                 addressLineField,
                 registerButton, loginButton, homeLink
         );
-        root.getChildren().addAll(intro, form);
+        formWrap.getChildren().add(form);
+        root.getChildren().addAll(intro, formWrap);
+    }
+
+    private Label createIntroPoint(String text) {
+        Label label = new Label("• " + text);
+        label.setWrapText(true);
+        label.setStyle("-fx-font-size: 13px; -fx-text-fill: #edf7f3;");
+        return label;
     }
 
     private void showEmailVerificationDialog(String email) {
@@ -215,6 +237,7 @@ public class RegisterView extends ScrollPane {
         Label info = new Label("Entrez le code OTP envoye a " + email);
         TextField codeField = createField("Code OTP");
         Hyperlink resendLink = new Hyperlink("Renvoyer le code");
+        resendLink.setStyle("-fx-text-fill: #1d5f52;");
         resendLink.setOnAction(event -> {
             try {
                 UIUtils.showInfo(authService.resendOtp(email, "REGISTER"));
@@ -246,8 +269,8 @@ public class RegisterView extends ScrollPane {
     private TextField createField(String prompt) {
         TextField field = new TextField();
         field.setPromptText(prompt);
-        field.setMaxWidth(420);
-        field.setStyle("-fx-background-radius: 14; -fx-padding: 12;");
+        field.setMaxWidth(Double.MAX_VALUE);
+        field.setStyle(ViewFactory.inputStyle());
         return field;
     }
 
@@ -262,7 +285,7 @@ public class RegisterView extends ScrollPane {
 
     private void styleCombo(ComboBox<?> comboBox) {
         comboBox.setMaxWidth(Double.MAX_VALUE);
-        comboBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
+        comboBox.setStyle(ViewFactory.inputStyle());
         HBox.setHgrow(comboBox, Priority.ALWAYS);
     }
 
@@ -282,7 +305,7 @@ public class RegisterView extends ScrollPane {
         map.put("Rabat-Sale-Kenitra", List.of("Rabat", "Sale", "Kenitra", "Temara", "Khemisset"));
         map.put("Beni Mellal-Khenifra", List.of("Beni Mellal", "Khenifra", "Khouribga", "Azilal", "Fquih Ben Salah"));
         map.put("Casablanca-Settat", List.of("Casablanca", "Mohammedia", "Settat", "El Jadida", "Berrechid"));
-        map.put("Marrakech-Safi", List.of("Marrakech", "Safi", "Essaouira", "El Kelâa des Sraghna", "Youssoufia"));
+        map.put("Marrakech-Safi", List.of("Marrakech", "Safi", "Essaouira", "El Kelaa des Sraghna", "Youssoufia"));
         map.put("Draa-Tafilalet", List.of("Errachidia", "Ouarzazate", "Midelt", "Zagora", "Tinghir"));
         map.put("Souss-Massa", List.of("Agadir", "Inezgane", "Taroudant", "Tiznit", "Chtouka Ait Baha"));
         map.put("Guelmim-Oued Noun", List.of("Guelmim", "Tan-Tan", "Sidi Ifni", "Assa", "Plage Blanche"));
@@ -298,16 +321,16 @@ public class RegisterView extends ScrollPane {
         private PasswordToggleControl(String prompt) {
             passwordField.setPromptText(prompt);
             visibleField.setPromptText(prompt);
-            passwordField.setMaxWidth(420);
-            visibleField.setMaxWidth(420);
-            passwordField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
-            visibleField.setStyle("-fx-background-radius: 14; -fx-padding: 12 52 12 12;");
+            passwordField.setMaxWidth(Double.MAX_VALUE);
+            visibleField.setMaxWidth(Double.MAX_VALUE);
+            passwordField.setStyle(ViewFactory.inputStyle() + "-fx-padding: 13 64 13 14;");
+            visibleField.setStyle(ViewFactory.inputStyle() + "-fx-padding: 13 64 13 14;");
             visibleField.setManaged(false);
             visibleField.setVisible(false);
 
-            Button eyeButton = ViewFactory.createSecondaryButton("\uD83D\uDC41");
-            eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
-                    + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+            Button eyeButton = ViewFactory.createSecondaryButton("Voir");
+            eyeButton.setStyle("-fx-background-color: rgba(255,255,255,0.92); -fx-text-fill: #1f6f5f; "
+                    + "-fx-font-weight: bold; -fx-background-radius: 12; -fx-padding: 7 12 7 12; -fx-font-size: 12px;");
             eyeButton.setOnAction(event -> toggleVisibility(eyeButton));
 
             StackPane.setAlignment(eyeButton, Pos.CENTER_RIGHT);
@@ -322,16 +345,14 @@ public class RegisterView extends ScrollPane {
                 visibleField.setManaged(false);
                 passwordField.setVisible(true);
                 passwordField.setManaged(true);
-                eyeButton.setStyle("-fx-background-color: white; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
-                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+                eyeButton.setText("Voir");
             } else {
                 visibleField.setText(passwordField.getText());
                 passwordField.setVisible(false);
                 passwordField.setManaged(false);
                 visibleField.setVisible(true);
                 visibleField.setManaged(true);
-                eyeButton.setStyle("-fx-background-color: #daf1e9; -fx-text-fill: #1f6f5f; -fx-font-weight: bold; "
-                        + "-fx-background-radius: 12; -fx-padding: 6 11 6 11; -fx-font-size: 15px;");
+                eyeButton.setText("Masquer");
             }
         }
 

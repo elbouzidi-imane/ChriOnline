@@ -27,8 +27,6 @@ import javafx.scene.shape.Rectangle;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.stream.Collectors;
 
 public class ProductListView extends VBox {
     private static final CategoryDTO ALL_CATEGORY = createAllCategory();
@@ -37,41 +35,46 @@ public class ProductListView extends VBox {
     private final List<ProductDTO> allProducts = new ArrayList<>();
 
     public ProductListView() {
-        setSpacing(18);
-        setPadding(new Insets(22));
-        setStyle("-fx-background-color: linear-gradient(to bottom, #fff8ef, #ffe4c4 65%, #edf8f3);");
+        setSpacing(20);
+        setPadding(new Insets(26));
+        setStyle(ViewFactory.pageBackground());
 
+        VBox heading = new VBox(8);
         Label title = new Label("Catalogue ChriOnline");
-        title.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+        title.setStyle("-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
 
         Label subtitle = new Label(AppSession.isLoggedIn()
-                ? "Filtrez les categories, ouvrez les details et ajoutez vos articles au panier."
-                : "Un visiteur peut consulter les produits et les details avant de se connecter pour commander.");
+                ? "Filtrez les categories, ouvrez les fiches et ajoutez vos coups de coeur au panier."
+                : "Parcourez la collection librement avant de vous connecter pour commander.");
         subtitle.setStyle("-fx-font-size: 14px; -fx-text-fill: #5b5f63;");
         subtitle.setWrapText(true);
 
-        VBox heading = new VBox(8, title, subtitle);
+        Label capsule = new Label("SELECTIONS  •  NOUVEAUTES  •  VENTE EN LIGNE");
+        capsule.setStyle("-fx-background-color: rgba(255,246,235,0.94); -fx-text-fill: #a6621e; "
+                + "-fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 8 14 8 14; -fx-background-radius: 999;");
+
+        heading.getChildren().addAll(capsule, title, subtitle);
 
         ComboBox<CategoryDTO> categoryBox = new ComboBox<>();
         categoryBox.setPromptText("Filtrer par categorie");
-        categoryBox.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-padding: 4;");
-        categoryBox.setPrefWidth(230);
-
-        Button homeButton = createHeaderButton("Accueil");
-        homeButton.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
+        categoryBox.setStyle(ViewFactory.inputStyle());
+        categoryBox.setPrefWidth(250);
 
         HBox toolbar;
         if (AppSession.isLoggedIn()) {
-            Button profileButton = createHeaderButton("Mon profil");
+            Button homeButton = ViewFactory.createSecondaryButton("Accueil");
+            homeButton.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
+
+            Button profileButton = ViewFactory.createSecondaryButton("Mon profil");
             profileButton.setOnAction(event -> NavigationManager.navigateTo(new ProfileView()));
 
-            Button historyButton = createHeaderButton("Mes commandes");
+            Button historyButton = ViewFactory.createSecondaryButton("Mes commandes");
             historyButton.setOnAction(event -> NavigationManager.navigateTo(new OrderHistoryView()));
 
-            Button cartButton = createPrimaryButton("Panier");
+            Button cartButton = ViewFactory.createPrimaryButton("Panier");
             cartButton.setOnAction(event -> NavigationManager.navigateTo(new CartView()));
 
-            Button logoutButton = createHeaderButton("Deconnexion");
+            Button logoutButton = ViewFactory.createSecondaryButton("Deconnexion");
             logoutButton.setOnAction(event -> {
                 AppSession.clear();
                 NavigationManager.navigateTo(new HomeView());
@@ -79,14 +82,22 @@ public class ProductListView extends VBox {
 
             toolbar = ViewFactory.createTopBar(categoryBox, homeButton, profileButton, historyButton, cartButton, logoutButton);
         } else {
-            Button loginButton = createHeaderButton("Se connecter");
+            Button homeButton = ViewFactory.createSecondaryButton("Accueil");
+            homeButton.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
+
+            Button loginButton = ViewFactory.createSecondaryButton("Se connecter");
             loginButton.setOnAction(event -> NavigationManager.navigateTo(new LoginView()));
 
-            Button registerButton = createPrimaryButton("S'inscrire");
+            Button registerButton = ViewFactory.createPrimaryButton("S'inscrire");
             registerButton.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
 
             toolbar = ViewFactory.createTopBar(categoryBox, homeButton, loginButton, registerButton);
         }
+
+        HBox summaryRow = new HBox(16,
+                createInfoTile("Navigation simple", "Des cartes plus lisibles et des actions plus nettes."),
+                createInfoTile("Categories", "Un filtre direct pour isoler rapidement chaque univers."),
+                createInfoTile("Fiche produit", "Acces detaille avant ajout au panier."));
 
         ListView<ProductDTO> listView = new ListView<>();
         listView.setStyle("-fx-background-color: transparent; -fx-control-inner-background: transparent;");
@@ -100,25 +111,25 @@ public class ProductListView extends VBox {
                 }
 
                 StackPane imageBox = new StackPane();
-                imageBox.setPrefSize(128, 128);
-                imageBox.setMaxSize(128, 128);
+                imageBox.setPrefSize(146, 146);
+                imageBox.setMaxSize(146, 146);
 
-                Rectangle bg = new Rectangle(128, 128);
-                bg.setArcWidth(26);
-                bg.setArcHeight(26);
-                bg.setFill(Color.web(item.isDisponible() ? "#ffd9b8" : "#e5e7eb"));
+                Rectangle bg = new Rectangle(146, 146);
+                bg.setArcWidth(30);
+                bg.setArcHeight(30);
+                bg.setFill(Color.web(item.isDisponible() ? "#f3c99c" : "#dde1e4"));
 
                 Label placeholder = new Label(item.getNom().substring(0, 1).toUpperCase());
-                placeholder.setStyle("-fx-font-size: 36px; -fx-font-weight: bold; -fx-text-fill: #7c2d12;");
+                placeholder.setStyle("-fx-font-size: 40px; -fx-font-weight: bold; -fx-text-fill: #7c3e10;");
                 imageBox.getChildren().addAll(bg, placeholder);
 
                 if (item.getImageUrl() != null && !item.getImageUrl().isBlank()) {
                     try {
-                        Image image = new Image(item.getImageUrl(), 128, 128, true, true, true);
+                        Image image = new Image(item.getImageUrl(), 146, 146, true, true, true);
                         if (!image.isError()) {
                             ImageView imageView = new ImageView(image);
-                            imageView.setFitWidth(128);
-                            imageView.setFitHeight(128);
+                            imageView.setFitWidth(146);
+                            imageView.setFitHeight(146);
                             imageView.setPreserveRatio(true);
                             imageBox.getChildren().setAll(bg, imageView);
                         }
@@ -126,43 +137,50 @@ public class ProductListView extends VBox {
                     }
                 }
 
+                VBox content = new VBox(10);
+                content.setAlignment(Pos.CENTER_LEFT);
+
+                if (item.getCategorie() != null && item.getCategorie().getNom() != null && !item.getCategorie().getNom().isBlank()) {
+                    Label categoryLabel = new Label(item.getCategorie().getNom());
+                    categoryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #1f6f5f; "
+                            + "-fx-background-color: #daf1e9; -fx-padding: 6 10 6 10; -fx-background-radius: 999;");
+                    content.getChildren().add(categoryLabel);
+                }
+
                 Label name = new Label(item.getNom());
-                name.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+                name.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
 
                 Label desc = new Label(item.getDescription() == null ? "Description bientot disponible." : item.getDescription());
                 desc.setWrapText(true);
                 desc.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
+                HBox priceRow = new HBox(10);
+                priceRow.setAlignment(Pos.CENTER_LEFT);
                 Label price = new Label(PriceUtils.formatMad(item.getPrixAffiche()));
-                price.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+                price.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #cc6b1d;");
 
-                Label stock = new Label(item.isDisponible() ? "En stock" : "Indisponible");
-                stock.setStyle("-fx-font-size: 12px; -fx-text-fill: " + (item.isDisponible() ? "#166534;" : "#991b1b;"));
+                Label stock = new Label(item.isDisponible() ? "Disponible" : "Rupture");
+                stock.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: "
+                        + (item.isDisponible() ? "#166534;" : "#991b1b;")
+                        + "-fx-background-color: " + (item.isDisponible() ? "#edf9ef;" : "#fdecec;")
+                        + "-fx-padding: 6 10 6 10; -fx-background-radius: 999;");
+                priceRow.getChildren().addAll(price, stock);
 
                 Region spacer = new Region();
                 HBox.setHgrow(spacer, Priority.ALWAYS);
 
-                Button detailButton = createPrimaryButton("Voir");
+                Button detailButton = ViewFactory.createPrimaryButton("Voir la fiche");
                 detailButton.setOnAction(event -> NavigationManager.navigateTo(new ProductDetailView(item)));
 
-                HBox footer = new HBox(10, price, stock, spacer, detailButton);
+                HBox footer = new HBox(12, priceRow, spacer, detailButton);
                 footer.setAlignment(Pos.CENTER_LEFT);
 
-                VBox content = new VBox(10);
-                if (item.getCategorie() != null && item.getCategorie().getNom() != null && !item.getCategorie().getNom().isBlank()) {
-                    Label categoryLabel = new Label(item.getCategorie().getNom());
-                    categoryLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #1f6f5f; "
-                            + "-fx-background-color: #daf1e9; -fx-padding: 5 8 5 8; -fx-background-radius: 999;");
-                    content.getChildren().add(categoryLabel);
-                }
                 content.getChildren().addAll(name, desc, footer);
-                content.setAlignment(Pos.CENTER_LEFT);
-                content.setFillWidth(true);
 
-                HBox card = new HBox(18, imageBox, content);
+                HBox card = new HBox(20, imageBox, content);
                 card.setAlignment(Pos.CENTER_LEFT);
-                card.setPadding(new Insets(16));
-                card.setStyle(ViewFactory.cardStyle());
+                card.setPadding(new Insets(18));
+                card.setStyle(ViewFactory.elevatedCardStyle());
 
                 setGraphic(card);
             }
@@ -200,25 +218,21 @@ public class ProductListView extends VBox {
             UIUtils.showError(e.getMessage());
         }
 
-        getChildren().addAll(heading, toolbar, listView);
+        getChildren().addAll(heading, toolbar, summaryRow, listView);
         VBox.setVgrow(listView, Priority.ALWAYS);
     }
 
-    private List<ProductDTO> filterProducts(CategoryDTO selected) {
-        if (selected == null || selected.getId() == -1) {
-            return allProducts;
-        }
-
-        String selectedName = normalize(selected.getNom());
-        return allProducts.stream()
-                .filter(product -> product.getCategorie() != null)
-                .filter(product -> product.getCategorie().getId() == selected.getId()
-                        || normalize(product.getCategorie().getNom()).equals(selectedName))
-                .collect(Collectors.toList());
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    private VBox createInfoTile(String title, String text) {
+        Label top = new Label(title);
+        top.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #17342d;");
+        Label bottom = new Label(text);
+        bottom.setWrapText(true);
+        bottom.setStyle("-fx-font-size: 13px; -fx-text-fill: #55616a;");
+        VBox box = new VBox(6, top, bottom);
+        box.setPadding(new Insets(18));
+        box.setPrefWidth(280);
+        box.setStyle(ViewFactory.cardStyle());
+        return box;
     }
 
     private static CategoryDTO createAllCategory() {
@@ -238,13 +252,5 @@ public class ProductListView extends VBox {
                 return getNom();
             }
         };
-    }
-
-    private Button createPrimaryButton(String text) {
-        return ViewFactory.createPrimaryButton(text);
-    }
-
-    private Button createHeaderButton(String text) {
-        return ViewFactory.createSecondaryButton(text);
     }
 }

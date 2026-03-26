@@ -30,9 +30,11 @@ public class MainApp extends Application {
         NavigationManager.navigateTo(new HomeView());
 
         stage.setTitle("ChriOnline");
-        stage.setWidth(900);
-        stage.setHeight(600);
-        stage.setResizable(false);
+        stage.setWidth(1280);
+        stage.setHeight(860);
+        stage.setMinWidth(1180);
+        stage.setMinHeight(760);
+        stage.setResizable(true);
         stage.show();
     }
 

@@ -5,23 +5,29 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
 
-public class HomeView extends VBox {
+public class HomeView extends ScrollPane {
     public HomeView() {
-        setSpacing(26);
-        setPadding(new Insets(24));
-        setStyle("-fx-background-color: linear-gradient(to bottom, #fff8ef, #ffe2bd 52%, #eef7f3);");
+        VBox root = new VBox(28);
+        root.setPadding(new Insets(28));
+        root.setStyle(ViewFactory.pageBackground());
+
+        setFitToWidth(true);
+        setHbarPolicy(ScrollBarPolicy.NEVER);
+        setVbarPolicy(ScrollBarPolicy.AS_NEEDED);
+        setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        setContent(root);
 
         Label logo = new Label("ChriOnline");
-        logo.setStyle("-fx-font-size: 34px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+        logo.setStyle("-fx-font-size: 38px; -fx-font-weight: bold; -fx-text-fill: #15372f;");
 
         Button categoriesButton = ViewFactory.createSecondaryButton("Catalogue");
         categoriesButton.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
@@ -32,115 +38,116 @@ public class HomeView extends VBox {
 
         HBox topBar = ViewFactory.createTopBar(logo, categoriesButton, loginButton, registerButton);
 
-        VBox left = new VBox(18);
+        VBox left = new VBox(20);
         left.setAlignment(Pos.CENTER_LEFT);
-        left.setPrefWidth(470);
+        left.setFillWidth(true);
+        HBox.setHgrow(left, Priority.ALWAYS);
 
-        Label capsule = new Label("MODE FEMME • HOMME • ENFANT • SPORT");
-        capsule.setStyle("-fx-background-color: #12372e; -fx-text-fill: white; -fx-font-size: 11px; "
-                + "-fx-font-weight: bold; -fx-padding: 8 14 8 14; -fx-background-radius: 999;");
+        Label capsule = new Label("COLLECTIONS CURATEES  •  FEMME  •  HOMME  •  ENFANT");
+        capsule.setStyle("-fx-background-color: rgba(22,70,61,0.96); -fx-text-fill: white; "
+                + "-fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 9 16 9 16; -fx-background-radius: 999;");
 
-        Label title = new Label("Un shopping plus clair, plus coloré et plus rapide.");
+        Label title = new Label("Une vitrine mode plus nette, plus premium et plus facile a parcourir.");
         title.setWrapText(true);
-        title.setStyle("-fx-font-size: 46px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
+        title.setMaxWidth(560);
+        title.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: #17342d;");
 
-        Label subtitle = new Label("Parcourez le catalogue sans connexion, ouvrez les fiches produit, comparez les tailles, puis connectez-vous pour ajouter au panier, commander et suivre vos achats.");
+        Label subtitle = new Label("Explorez les produits, comparez les tailles, finalisez votre panier puis suivez vos commandes dans une interface plus elegante et plus lisible.");
         subtitle.setWrapText(true);
-        subtitle.setStyle("-fx-font-size: 15px; -fx-text-fill: #55616a;");
+        subtitle.setMaxWidth(560);
+        subtitle.setStyle("-fx-font-size: 15px; -fx-text-fill: #54646d; -fx-line-spacing: 2px;");
 
         HBox ctaRow = new HBox(12);
-        Button shopNowButton = ViewFactory.createPrimaryButton("Voir les produits");
+        Button shopNowButton = ViewFactory.createPrimaryButton("Explorer la collection");
         shopNowButton.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
-        Button accountButton = ViewFactory.createSecondaryButton("Creer mon compte");
+        Button accountButton = ViewFactory.createSecondaryButton("Creer mon espace");
         accountButton.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
         ctaRow.getChildren().addAll(shopNowButton, accountButton);
 
         HBox metrics = new HBox(14,
-                createMetricCard("Catalogue ouvert", "Accessible avant connexion"),
-                createMetricCard("Guide de taille", "Visible dans la fiche produit"),
-                createMetricCard("Commande", "Panier, checkout et historique"));
+                createMetricCard("Mode libre", "Catalogue visible sans compte"),
+                createMetricCard("Guides utiles", "Tailles et details produits"),
+                createMetricCard("Suivi clair", "Panier, commande et historique"));
 
         left.getChildren().addAll(capsule, title, subtitle, ctaRow, metrics);
 
         StackPane right = buildHeroPanel();
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox heroRow = new HBox(24, left, right);
+        heroRow.setAlignment(Pos.TOP_LEFT);
 
-        HBox heroRow = new HBox(24, left, spacer, right);
-        heroRow.setAlignment(Pos.CENTER_LEFT);
+        HBox strips = new HBox(16,
+                createFeatureStrip("Livraison flexible", "Standard, express et point relais avec parcours plus lisible.", "#fff3e4"),
+                createFeatureStrip("Paiement simplifie", "Carte, PayPal ou mode fictif dans un checkout plus propre.", "#eaf4ef"),
+                createFeatureStrip("Admin plus direct", "Produits, commandes et utilisateurs reunis dans une UI plus structuree.", "#f7f1ea"));
 
-        HBox strips = new HBox(14,
-                createFeatureStrip("Livraison", "Standard, express et point relais", "#fff2df"),
-                createFeatureStrip("Paiement", "Carte bancaire, PayPal ou fictif", "#eef8f4"),
-                createFeatureStrip("Historique", "Photos, taille, couleur et detail commande", "#fff7ef"));
+        Label focusTitle = new Label("Une interface plus mode, moins scolaire");
+        focusTitle.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
 
-        Label focusTitle = new Label("Pourquoi commencer ici");
-        focusTitle.setStyle("-fx-font-size: 21px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
+        HBox cards = new HBox(16,
+                createFeatureCard("Navigation plus elegante", "Des cartes plus aeriennes, un contraste plus net et une hierarchie plus claire des actions."),
+                createFeatureCard("Catalogue mieux valorise", "Les produits gagnent en presence avec un cadre plus premium et des badges mieux integres."),
+                createFeatureCard("Parcours plus fluide", "Les ecrans de connexion et d'inscription prennent une direction visuelle plus forte et plus coherente."));
 
-        HBox cards = new HBox(14,
-                createFeatureCard("Explorer sans compte", "Le visiteur peut filtrer les categories et consulter les details produit avant de se connecter."),
-                createFeatureCard("Acheter avec plus de confiance", "Le panier, le checkout et l'historique affichent les bonnes informations de taille, photo et prix."),
-                createFeatureCard("Gerer facilement", "Une fois admin, vous accedez a un espace separe pour produits, utilisateurs et commandes."));
-
-        getChildren().addAll(topBar, heroRow, strips, focusTitle, cards);
+        root.getChildren().addAll(topBar, heroRow, strips, focusTitle, cards);
     }
 
     private StackPane buildHeroPanel() {
         StackPane hero = new StackPane();
-        hero.setPrefSize(420, 470);
-        hero.setMaxSize(420, 470);
+        hero.setPrefSize(390, 460);
+        hero.setMaxSize(390, 460);
+        hero.setStyle(ViewFactory.glassPanelStyle());
 
-        Rectangle base = new Rectangle(420, 470);
-        base.setArcWidth(42);
-        base.setArcHeight(42);
-        base.setFill(Color.rgb(255, 255, 255, 0.55));
+        Rectangle base = new Rectangle(390, 460);
+        base.setArcWidth(56);
+        base.setArcHeight(56);
+        base.setFill(Color.rgb(255, 250, 244, 0.48));
 
-        Rectangle orangeCard = new Rectangle(240, 300);
-        orangeCard.setArcWidth(32);
-        orangeCard.setArcHeight(32);
-        orangeCard.setTranslateX(70);
-        orangeCard.setTranslateY(-40);
-        orangeCard.setFill(Color.web("#eb8b1b"));
+        Rectangle sandPanel = new Rectangle(220, 300);
+        sandPanel.setArcWidth(34);
+        sandPanel.setArcHeight(34);
+        sandPanel.setTranslateX(70);
+        sandPanel.setTranslateY(-42);
+        sandPanel.setFill(Color.web("#d58f43"));
 
-        Rectangle greenCard = new Rectangle(260, 320);
-        greenCard.setArcWidth(32);
-        greenCard.setArcHeight(32);
-        greenCard.setTranslateX(-56);
-        greenCard.setTranslateY(24);
-        greenCard.setFill(Color.web("#196b5a"));
+        Rectangle greenPanel = new Rectangle(248, 316);
+        greenPanel.setArcWidth(34);
+        greenPanel.setArcHeight(34);
+        greenPanel.setTranslateX(-52);
+        greenPanel.setTranslateY(24);
+        greenPanel.setFill(Color.web("#1b5f52"));
 
-        Circle bubbleTop = new Circle(48, Color.web("#fff1dc"));
-        bubbleTop.setTranslateX(-132);
+        Circle bubbleTop = new Circle(46, Color.web("#fff1df"));
+        bubbleTop.setTranslateX(-124);
         bubbleTop.setTranslateY(-142);
 
-        Circle bubbleBottom = new Circle(42, Color.web("#dff4eb"));
-        bubbleBottom.setTranslateX(138);
+        Circle bubbleBottom = new Circle(42, Color.web("#ddefe8"));
+        bubbleBottom.setTranslateX(128);
         bubbleBottom.setTranslateY(152);
 
-        Label heroWord = new Label("STYLE\nSTORE");
-        heroWord.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: white;");
-        heroWord.setTranslateX(-36);
+        Label heroWord = new Label("CURATED\nSTYLE");
+        heroWord.setStyle("-fx-font-size: 46px; -fx-font-weight: bold; -fx-text-fill: white;");
+        heroWord.setTranslateX(-28);
         heroWord.setTranslateY(-18);
 
         VBox promoCard = new VBox(10);
         promoCard.setPadding(new Insets(18));
-        promoCard.setMaxWidth(210);
-        promoCard.setTranslateX(-92);
-        promoCard.setTranslateY(128);
-        promoCard.setStyle("-fx-background-color: rgba(255,255,255,0.96); -fx-background-radius: 24;");
+        promoCard.setMaxWidth(205);
+        promoCard.setTranslateX(-86);
+        promoCard.setTranslateY(132);
+        promoCard.setStyle(ViewFactory.elevatedCardStyle());
 
-        Label promoBadge = new Label("NOUVEAU");
-        promoBadge.setStyle("-fx-background-color: #eb8b1b; -fx-text-fill: white; -fx-font-size: 11px; "
+        Label promoBadge = new Label("NOUVELLE EXPERIENCE");
+        promoBadge.setStyle("-fx-background-color: #17342d; -fx-text-fill: white; -fx-font-size: 11px; "
                 + "-fx-font-weight: bold; -fx-padding: 6 10 6 10; -fx-background-radius: 999;");
-        Label promoTitle = new Label("Catalogue plus riche");
+        Label promoTitle = new Label("Interface retravaillee");
         promoTitle.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
-        Label promoText = new Label("Photos produit, guide de taille, couleurs, panier detaille et commandes enrichies.");
+        Label promoText = new Label("Un rendu plus editorial, plus chaud et plus coherent sur l'ensemble du parcours client.");
         promoText.setWrapText(true);
         promoText.setStyle("-fx-font-size: 12px; -fx-text-fill: #55616a;");
         promoCard.getChildren().addAll(promoBadge, promoTitle, promoText);
 
-        hero.getChildren().addAll(base, orangeCard, greenCard, bubbleTop, bubbleBottom, heroWord, promoCard);
+        hero.getChildren().addAll(base, sandPanel, greenPanel, bubbleTop, bubbleBottom, heroWord, promoCard);
         return hero;
     }
 
@@ -151,35 +158,36 @@ public class HomeView extends VBox {
         bottom.setWrapText(true);
         bottom.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
         VBox box = new VBox(5, top, bottom);
-        box.setPadding(new Insets(15));
-        box.setPrefWidth(154);
+        box.setPadding(new Insets(16));
+        box.setPrefWidth(160);
         box.setStyle(ViewFactory.cardStyle());
         return box;
     }
 
     private VBox createFeatureStrip(String title, String text, String bg) {
         Label top = new Label(title);
-        top.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
+        top.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
         Label bottom = new Label(text);
         bottom.setWrapText(true);
         bottom.setStyle("-fx-font-size: 13px; -fx-text-fill: #55616a;");
         VBox box = new VBox(6, top, bottom);
-        box.setPadding(new Insets(18));
+        box.setPadding(new Insets(20));
         box.setPrefWidth(286);
-        box.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 24;");
+        box.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 26; "
+                + "-fx-border-color: rgba(255,255,255,0.75); -fx-border-radius: 26;");
         return box;
     }
 
     private VBox createFeatureCard(String title, String text) {
         Label top = new Label(title);
-        top.setStyle("-fx-font-size: 17px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
+        top.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #16332b;");
         Label bottom = new Label(text);
         bottom.setWrapText(true);
         bottom.setStyle("-fx-font-size: 13px; -fx-text-fill: #55616a;");
         VBox box = new VBox(8, top, bottom);
-        box.setPadding(new Insets(18));
+        box.setPadding(new Insets(20));
         box.setPrefWidth(288);
-        box.setStyle(ViewFactory.cardStyle());
+        box.setStyle(ViewFactory.elevatedCardStyle());
         return box;
     }
 }

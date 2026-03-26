@@ -12,7 +12,7 @@ public final class NavigationManager {
     }
 
     public static void init(Stage stage) {
-        scene = new Scene(new StackPane(), 900, 600);
+        scene = new Scene(new StackPane(), 1280, 860);
         stage.setScene(scene);
     }
 
