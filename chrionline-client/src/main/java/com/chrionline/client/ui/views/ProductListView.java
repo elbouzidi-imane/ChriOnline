@@ -158,13 +158,22 @@ public class ProductListView extends VBox {
                 priceRow.setAlignment(Pos.CENTER_LEFT);
                 Label price = new Label(PriceUtils.formatMad(item.getPrixAffiche()));
                 price.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #cc6b1d;");
+                priceRow.getChildren().add(price);
+
+                if (item.hasReduction()) {
+                    Label oldPrice = new Label(PriceUtils.formatMad(item.getPrixOriginal()));
+                    oldPrice.setStyle("-fx-font-size: 13px; -fx-text-fill: #8a8f98; -fx-strikethrough: true;");
+                    Label promoBadge = new Label("-" + item.getReductionPercentage() + "%");
+                    promoBadge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: white; "
+                            + "-fx-background-color: #c2410c; -fx-padding: 5 8 5 8; -fx-background-radius: 999;");
+                    priceRow.getChildren().addAll(oldPrice, promoBadge);
+                }
 
                 Label stock = new Label(item.isDisponible() ? "Disponible" : "Rupture");
                 stock.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: "
                         + (item.isDisponible() ? "#166534;" : "#991b1b;")
                         + "-fx-background-color: " + (item.isDisponible() ? "#edf9ef;" : "#fdecec;")
                         + "-fx-padding: 6 10 6 10; -fx-background-radius: 999;");
-                priceRow.getChildren().addAll(price, stock);
 
                 Region spacer = new Region();
                 HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -172,7 +181,7 @@ public class ProductListView extends VBox {
                 Button detailButton = ViewFactory.createPrimaryButton("Voir la fiche");
                 detailButton.setOnAction(event -> NavigationManager.navigateTo(new ProductDetailView(item)));
 
-                HBox footer = new HBox(12, priceRow, spacer, detailButton);
+                HBox footer = new HBox(12, priceRow, stock, spacer, detailButton);
                 footer.setAlignment(Pos.CENTER_LEFT);
 
                 content.getChildren().addAll(name, desc, footer);

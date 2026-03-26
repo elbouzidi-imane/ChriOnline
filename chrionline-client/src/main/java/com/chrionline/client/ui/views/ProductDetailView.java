@@ -97,14 +97,27 @@ public class ProductDetailView extends ScrollPane {
         description.setWrapText(true);
         description.setStyle("-fx-font-size: 14px; -fx-text-fill: #4b5563;");
 
+        HBox priceBox = new HBox(10);
+        priceBox.setAlignment(Pos.CENTER_LEFT);
+
         Label price = new Label(PriceUtils.formatMad(fullProduct.getPrixAffiche()));
         price.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+        priceBox.getChildren().add(price);
+
+        if (fullProduct.hasReduction()) {
+            Label oldPrice = new Label(PriceUtils.formatMad(fullProduct.getPrixOriginal()));
+            oldPrice.setStyle("-fx-font-size: 16px; -fx-text-fill: #8a8f98; -fx-strikethrough: true;");
+            Label badge = new Label("-" + fullProduct.getReductionPercentage() + "%");
+            badge.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: white; "
+                    + "-fx-background-color: #c2410c; -fx-padding: 6 9 6 9; -fx-background-radius: 999;");
+            priceBox.getChildren().addAll(oldPrice, badge);
+        }
 
         Label info = new Label("Matiere : " + safe(fullProduct.getMatiere()) + "   |   Couleur : " + safe(fullProduct.getCouleur()));
         info.setWrapText(true);
         info.setStyle("-fx-font-size: 13px; -fx-text-fill: #374151;");
 
-        headerBox.getChildren().addAll(title, description, price, info);
+        headerBox.getChildren().addAll(title, description, priceBox, info);
 
         ToggleGroup sizeGroup = new ToggleGroup();
         FlowPane sizesPane = new FlowPane();

@@ -67,6 +67,8 @@ public class AdminProductsView extends VBox {
         addCategory.setOnAction(event -> addCategory());
         Button edit = ViewFactory.createSecondaryButton("Modifier produit");
         edit.setOnAction(event -> editProduct());
+        Button reductions = ViewFactory.createSecondaryButton("Gerer reductions");
+        reductions.setOnAction(event -> manageReduction());
         Button stock = ViewFactory.createSecondaryButton("Gerer stock par taille");
         stock.setOnAction(event -> updateStock());
         Button sizes = ViewFactory.createSecondaryButton("Gerer tailles");
@@ -75,7 +77,7 @@ public class AdminProductsView extends VBox {
         guides.setOnAction(event -> manageGuides());
         Button delete = ViewFactory.createSecondaryButton("Supprimer produit");
         delete.setOnAction(event -> deleteProduct());
-        headerActions.getChildren().addAll(refresh, add, addCategory, categoriesInfo, edit, stock, sizes, guides, delete);
+        headerActions.getChildren().addAll(refresh, add, addCategory, categoriesInfo, edit, reductions, stock, sizes, guides, delete);
 
         Label hint = new Label("Cette page gere les produits, le stock par taille et les guides. Les categories sont choisies par nom pour eviter la saisie manuelle d'un id.");
         hint.setWrapText(true);
@@ -93,13 +95,16 @@ public class AdminProductsView extends VBox {
         TableColumn<ProductDTO, String> priceCol = new TableColumn<>("Prix");
         priceCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(PriceUtils.formatMad(data.getValue().getPrixAffiche())));
 
+        TableColumn<ProductDTO, String> reductionCol = new TableColumn<>("Reduction");
+        reductionCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(resolveReduction(data.getValue())));
+
         TableColumn<ProductDTO, String> colorCol = new TableColumn<>("Couleur");
         colorCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(valueOrDash(data.getValue().getCouleur())));
 
         TableColumn<ProductDTO, String> stockCol = new TableColumn<>("Stock");
         stockCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(String.valueOf(data.getValue().getStock())));
 
-        productsTable.getColumns().setAll(nameCol, categoryCol, priceCol, colorCol, stockCol);
+        productsTable.getColumns().setAll(nameCol, categoryCol, priceCol, reductionCol, colorCol, stockCol);
 
         VBox card = new VBox(14, headerActions, hint, productsTable);
         card.setPadding(new Insets(18));
@@ -547,7 +552,11 @@ public class AdminProductsView extends VBox {
         }
         if (!prixReduitField.getText().isBlank()) {
             try {
-                Double.parseDouble(normalizeDecimal(prixReduitField.getText()));
+                double reducedPrice = Double.parseDouble(normalizeDecimal(prixReduitField.getText()));
+                if (reducedPrice <= 0 || reducedPrice >= data.prixOriginal) {
+                    UIUtils.showError("Le prix reduit doit etre inferieur au prix original.");
+                    return null;
+                }
                 data.prixReduit = normalizeDecimal(prixReduitField.getText());
             } catch (NumberFormatException e) {
                 UIUtils.showError("Le prix reduit est invalide.");
@@ -630,6 +639,70 @@ public class AdminProductsView extends VBox {
         }
     }
 
+    private void manageReduction() {
+        ProductDTO selected = productsTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            UIUtils.showError("Selectionnez un produit.");
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Gerer reduction produit");
+        DialogPane pane = dialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        Label originalPrice = new Label("Prix original : " + PriceUtils.formatMad(selected.getPrixOriginal()));
+        originalPrice.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #17342d;");
+
+        TextField reducedPriceField = new TextField(selected.hasReduction() ? String.valueOf(selected.getPrixReduit()) : "");
+        reducedPriceField.setPromptText("Laissez vide pour supprimer la reduction");
+
+        Label helper = new Label("Le prix reduit doit etre inferieur au prix original pour apparaitre dans le catalogue.");
+        helper.setWrapText(true);
+        helper.setStyle("-fx-font-size: 12px; -fx-text-fill: #6b7280;");
+
+        pane.setContent(new VBox(12, originalPrice, new Label("Prix reduit"), reducedPriceField, helper));
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return;
+        }
+
+        String reducedValue = normalizeDecimal(reducedPriceField.getText());
+        if (!reducedValue.isBlank()) {
+            try {
+                double reducedPrice = Double.parseDouble(reducedValue);
+                if (reducedPrice <= 0 || reducedPrice >= selected.getPrixOriginal()) {
+                    UIUtils.showError("Le prix reduit doit etre inferieur au prix original.");
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                UIUtils.showError("Le prix reduit est invalide.");
+                return;
+            }
+        }
+
+        try {
+            adminService.updateProduct(
+                    selected.getId(),
+                    selected.getNom(),
+                    nullToEmpty(selected.getDescription()),
+                    nullToEmpty(selected.getMatiere()),
+                    nullToEmpty(selected.getCouleur()),
+                    selected.getPrixOriginal(),
+                    reducedValue,
+                    nullToEmpty(selected.getImageUrl())
+            );
+            loadProducts();
+            UIUtils.showSuccess(reducedValue.isBlank()
+                    ? "Reduction supprimee avec succes."
+                    : "Reduction mise a jour avec succes.");
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
+        }
+    }
+
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
     }
@@ -652,6 +725,13 @@ public class AdminProductsView extends VBox {
                 .map(CategoryDTO::getNom)
                 .findFirst()
                 .orElse("-");
+    }
+
+    private String resolveReduction(ProductDTO product) {
+        if (!product.hasReduction()) {
+            return "-";
+        }
+        return "-" + product.getReductionPercentage() + "% (" + PriceUtils.formatMad(product.getPrixReduit()) + ")";
     }
 
     private void showCategoryInfo() {

@@ -79,6 +79,17 @@ public class ProductDTO {
         return prixReduit > 0 ? prixReduit : prixOriginal;
     }
 
+    public boolean hasReduction() {
+        return prixReduit > 0 && prixReduit < prixOriginal;
+    }
+
+    public int getReductionPercentage() {
+        if (!hasReduction() || prixOriginal <= 0) {
+            return 0;
+        }
+        return (int) Math.round((1 - (prixReduit / prixOriginal)) * 100);
+    }
+
     public boolean isDisponible() {
         return "ACTIF".equals(statut) && stock > 0;
     }
