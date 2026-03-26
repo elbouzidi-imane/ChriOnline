@@ -158,6 +158,18 @@ CREATE TABLE livraison (
                            suivi_actif    BOOLEAN DEFAULT FALSE
 );
 
+CREATE TABLE avis_produit (
+                              id SERIAL PRIMARY KEY,
+                              utilisateur_id INT NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+                              produit_id INT NOT NULL REFERENCES produit(id) ON DELETE CASCADE,
+                              commande_id INT NOT NULL REFERENCES commande(id) ON DELETE CASCADE,
+                              note INT NOT NULL CHECK (note BETWEEN 1 AND 5),
+                              commentaire TEXT,
+                              avis_taille VARCHAR(10) NOT NULL CHECK (avis_taille IN ('PETIT', 'JUSTE', 'GRAND')),
+                              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                              UNIQUE (utilisateur_id, produit_id, commande_id)
+);
+
 -- ============================================================
 --  DONNÉES DE TEST
 -- ============================================================

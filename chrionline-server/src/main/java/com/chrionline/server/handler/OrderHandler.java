@@ -4,9 +4,11 @@ import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.CancellationResult;
 import com.chrionline.server.model.Order;
+import com.chrionline.server.model.ProductReview;
 import com.chrionline.server.model.PromoValidationResult;
 import com.chrionline.server.service.OrderService;
 import com.chrionline.server.service.PromoService;
+import com.chrionline.server.service.ReviewService;
 import com.google.gson.Gson;
 
 import java.util.List;
@@ -15,6 +17,7 @@ public class OrderHandler {
 
     private final OrderService orderService = new OrderService();
     private final PromoService promoService = new PromoService();
+    private final ReviewService reviewService = new ReviewService();
     private final Gson gson = new Gson();
 
     public Message handle(Message request) {
@@ -26,6 +29,7 @@ public class OrderHandler {
             case Protocol.CANCEL_ORDER -> handleCancelOrder(request);
             case Protocol.GET_CANCELLATION_CONFIG -> handleGetCancellationConfig();
             case Protocol.APPLY_PROMO -> handleApplyPromo(request);
+            case Protocol.ADD_PRODUCT_REVIEW -> handleAddProductReview(request);
             default -> Message.error("Type non gere par OrderHandler");
         };
     }
@@ -136,6 +140,29 @@ public class OrderHandler {
             return Message.ok(Protocol.APPLY_PROMO, gson.toJson(result));
         } catch (Exception e) {
             return Message.error("Erreur promo : " + e.getMessage());
+        }
+    }
+
+    private Message handleAddProductReview(Message req) {
+        try {
+            String[] parts = req.getPayload().split("\\|", -1);
+            if (parts.length < 6) {
+                return Message.error("Format invalide");
+            }
+            int userId = Integer.parseInt(parts[0].trim());
+            int orderId = Integer.parseInt(parts[1].trim());
+            int productId = Integer.parseInt(parts[2].trim());
+            int note = Integer.parseInt(parts[3].trim());
+            String avisTaille = parts[4].trim();
+            String commentaire = parts[5].trim();
+
+            ProductReview review = reviewService.addReview(userId, orderId, productId, note, commentaire, avisTaille);
+            if (review == null) {
+                return Message.error("Impossible d'ajouter l'avis. Verifiez la commande, le produit ou un doublon.");
+            }
+            return Message.ok(Protocol.ADD_PRODUCT_REVIEW, gson.toJson(review));
+        } catch (Exception e) {
+            return Message.error("Erreur ajout avis : " + e.getMessage());
         }
     }
 }

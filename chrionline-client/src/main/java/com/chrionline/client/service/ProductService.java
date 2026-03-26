@@ -2,6 +2,7 @@ package com.chrionline.client.service;
 
 import com.chrionline.client.model.CategoryDTO;
 import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.ProductReviewDTO;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.util.JsonUtils;
 import com.chrionline.common.Message;
@@ -46,6 +47,15 @@ public class ProductService {
             throw new IllegalStateException(response.getPayload());
         }
         Type listType = new TypeToken<List<ProductDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public List<ProductReviewDTO> getReviews(int productId) throws Exception {
+        Message response = tcp.send(new Message(Protocol.GET_PRODUCT_REVIEWS, String.valueOf(productId)));
+        if (response.isError()) {
+            throw new IllegalStateException(response.getPayload());
+        }
+        Type listType = new TypeToken<List<ProductReviewDTO>>() { }.getType();
         return JsonUtils.GSON.fromJson(response.getPayload(), listType);
     }
 }

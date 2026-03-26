@@ -79,7 +79,8 @@ public class ClientHandler implements Runnable {
             case Protocol.GET_PRODUCTS,
                  Protocol.GET_PRODUCT,
                  Protocol.GET_CATEGORIES,
-                 Protocol.GET_PRODUCTS_BY_CATEGORIE -> productHandler.handle(req);
+                 Protocol.GET_PRODUCTS_BY_CATEGORIE,
+                 Protocol.GET_PRODUCT_REVIEWS -> productHandler.handle(req);
 
             case Protocol.GET_CART,
                  Protocol.ADD_TO_CART,
@@ -93,6 +94,7 @@ public class ClientHandler implements Runnable {
                  Protocol.CANCEL_ORDER,
                  Protocol.GET_CANCELLATION_CONFIG,
                  Protocol.APPLY_PROMO,
+                 Protocol.ADD_PRODUCT_REVIEW,
                  Protocol.PAY -> orderHandler.handle(req);
 
             case Protocol.ADMIN_ADD_PRODUCT,

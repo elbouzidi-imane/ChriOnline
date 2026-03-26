@@ -2,6 +2,7 @@ package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.GuideDTO;
 import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.ProductReviewDTO;
 import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.service.CartService;
 import com.chrionline.client.service.ProductService;
@@ -31,6 +32,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import java.util.List;
+import java.text.SimpleDateFormat;
 
 public class ProductDetailView extends ScrollPane {
     private final CartService cartService = new CartService();
@@ -192,7 +194,9 @@ public class ProductDetailView extends ScrollPane {
         HBox content = new HBox(24, imageBox, right);
         content.setAlignment(Pos.TOP_LEFT);
 
-        page.getChildren().addAll(actions, content);
+        VBox reviewsSection = createReviewsSection(fullProduct);
+
+        page.getChildren().addAll(actions, content, reviewsSection);
     }
 
     private ProductDTO resolveProduct(ProductDTO product) {
@@ -278,5 +282,48 @@ public class ProductDetailView extends ScrollPane {
 
     private String safe(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private VBox createReviewsSection(ProductDTO product) {
+        Label title = new Label("Avis clients");
+        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+        VBox reviewsBox = new VBox(12);
+        try {
+            List<ProductReviewDTO> reviews = productService.getReviews(product.getId());
+            if (reviews.isEmpty()) {
+                Label empty = new Label("Aucun avis pour le moment.");
+                empty.setStyle("-fx-font-size: 13px; -fx-text-fill: #6b7280;");
+                reviewsBox.getChildren().add(empty);
+            } else {
+                SimpleDateFormat format = new SimpleDateFormat("dd/MM/yyyy");
+                for (ProductReviewDTO review : reviews) {
+                    Label stars = new Label("★".repeat(review.getNote()) + "☆".repeat(5 - review.getNote()));
+                    stars.setStyle("-fx-font-size: 18px; -fx-text-fill: #d97706;");
+
+                    Label size = new Label("Taille ressentie : " + safe(review.getAvisTaille()));
+                    size.setStyle("-fx-font-size: 12px; -fx-text-fill: #1f6f5f;");
+
+                    Label comment = new Label(safe(review.getCommentaire()));
+                    comment.setWrapText(true);
+                    comment.setStyle("-fx-font-size: 13px; -fx-text-fill: #374151;");
+
+                    Label date = new Label(review.getCreatedAt() == null ? "" : format.format(review.getCreatedAt()));
+                    date.setStyle("-fx-font-size: 11px; -fx-text-fill: #8a8f98;");
+
+                    VBox card = new VBox(8, stars, size, comment, date);
+                    card.setPadding(new Insets(16));
+                    card.setStyle(ViewFactory.cardStyle());
+                    reviewsBox.getChildren().add(card);
+                }
+            }
+        } catch (Exception e) {
+            Label error = new Label("Impossible de charger les avis.");
+            error.setStyle("-fx-font-size: 13px; -fx-text-fill: #991b1b;");
+            reviewsBox.getChildren().add(error);
+        }
+
+        VBox section = new VBox(12, title, reviewsBox);
+        return section;
     }
 }

@@ -22,6 +22,7 @@ public class Protocol {
     public static final String GET_PRODUCT = "GET_PRODUCT";
     public static final String GET_CATEGORIES = "GET_CATEGORIES";
     public static final String GET_PRODUCTS_BY_CATEGORIE = "GET_PRODUCTS_BY_CATEGORIE";
+    public static final String GET_PRODUCT_REVIEWS = "GET_PRODUCT_REVIEWS";
 
     public static final String GET_CART = "GET_CART";
     public static final String ADD_TO_CART = "ADD_TO_CART";
@@ -35,6 +36,7 @@ public class Protocol {
     public static final String CANCEL_ORDER = "CANCEL_ORDER";
     public static final String GET_CANCELLATION_CONFIG = "GET_CANCELLATION_CONFIG";
     public static final String APPLY_PROMO = "APPLY_PROMO";
+    public static final String ADD_PRODUCT_REVIEW = "ADD_PRODUCT_REVIEW";
 
     public static final String PAY = "PAY";
 

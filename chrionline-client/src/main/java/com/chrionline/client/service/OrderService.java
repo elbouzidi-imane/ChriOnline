@@ -3,6 +3,7 @@ package com.chrionline.client.service;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.CancellationConfigDTO;
 import com.chrionline.client.model.CancellationResultDTO;
+import com.chrionline.client.model.ProductReviewDTO;
 import com.chrionline.client.model.PromoValidationResultDTO;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.session.AppSession;
@@ -77,5 +78,21 @@ public class OrderService {
             throw new IllegalStateException(response.getPayload());
         }
         return JsonUtils.GSON.fromJson(response.getPayload(), PromoValidationResultDTO.class);
+    }
+
+    public ProductReviewDTO addProductReview(int orderId, int productId, int note, String avisTaille, String commentaire) throws Exception {
+        String payload = String.join("|",
+                String.valueOf(AppSession.getCurrentUser().getId()),
+                String.valueOf(orderId),
+                String.valueOf(productId),
+                String.valueOf(note),
+                avisTaille,
+                commentaire == null ? "" : commentaire
+        );
+        Message response = tcp.send(new Message(Protocol.ADD_PRODUCT_REVIEW, payload));
+        if (response.isError()) {
+            throw new IllegalStateException(response.getPayload());
+        }
+        return JsonUtils.GSON.fromJson(response.getPayload(), ProductReviewDTO.class);
     }
 }

@@ -5,6 +5,7 @@ import com.chrionline.client.model.CancellationResultDTO;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.OrderLineDTO;
 import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.ProductReviewDTO;
 import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.service.OrderService;
 import com.chrionline.client.service.ProductService;
@@ -17,7 +18,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableCell;
@@ -251,11 +256,15 @@ public class OrderHistoryView extends VBox {
                     pricing.setStyle("-fx-font-size: 13px; -fx-text-fill: #374151;");
 
                     VBox infoBox = new VBox(6, title, details, pricing);
+                    Button reviewButton = ViewFactory.createSecondaryButton("Laisser un avis");
+                    reviewButton.setOnAction(event -> openReviewDialog(detailedOrder, line, productName));
+                    VBox actionBox = new VBox(10, reviewButton);
+                    actionBox.setAlignment(Pos.CENTER_RIGHT);
                     infoBox.setAlignment(Pos.CENTER_LEFT);
                     Region lineSpacer = new Region();
                     HBox.setHgrow(lineSpacer, Priority.ALWAYS);
 
-                    HBox lineCard = new HBox(14, createProductThumb(product), infoBox, lineSpacer);
+                    HBox lineCard = new HBox(14, createProductThumb(product), infoBox, lineSpacer, actionBox);
                     lineCard.setPadding(new Insets(12));
                     lineCard.setStyle("-fx-background-color: rgba(255,255,255,0.92); -fx-background-radius: 16;");
                     linesBox.getChildren().add(lineCard);
@@ -334,5 +343,53 @@ public class OrderHistoryView extends VBox {
         placeholder.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
         wrapper.getChildren().add(placeholder);
         return wrapper;
+    }
+
+    private void openReviewDialog(OrderDTO order, OrderLineDTO line, String productName) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Laisser un avis");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setStyle("-fx-background-color: #fffaf5;");
+
+        ComboBox<Integer> ratingBox = new ComboBox<>();
+        ratingBox.getItems().addAll(1, 2, 3, 4, 5);
+        ratingBox.getSelectionModel().select(Integer.valueOf(5));
+
+        ComboBox<String> sizeBox = new ComboBox<>();
+        sizeBox.getItems().addAll("PETIT", "JUSTE", "GRAND");
+        sizeBox.getSelectionModel().select("JUSTE");
+
+        TextArea commentArea = new TextArea();
+        commentArea.setPromptText("Votre commentaire sur le produit...");
+        commentArea.setPrefRowCount(4);
+
+        VBox content = new VBox(
+                12,
+                new Label("Produit : " + productName),
+                new Label("Note sur 5 etoiles"),
+                ratingBox,
+                new Label("Taille ressentie"),
+                sizeBox,
+                new Label("Commentaire"),
+                commentArea
+        );
+        dialog.getDialogPane().setContent(content);
+
+        if (dialog.showAndWait().filter(ButtonType.OK::equals).isPresent()) {
+            try {
+                ProductReviewDTO review = orderService.addProductReview(
+                        order.getId(),
+                        line.getProduitId(),
+                        ratingBox.getValue(),
+                        sizeBox.getValue(),
+                        commentArea.getText().trim()
+                );
+                if (review != null) {
+                    UIUtils.showSuccess("Merci, votre avis a ete enregistre.");
+                }
+            } catch (Exception e) {
+                UIUtils.showError(e.getMessage());
+            }
+        }
     }
 }
