@@ -1,19 +1,36 @@
 package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.NotificationDTO;
+import com.chrionline.client.model.OrderDTO;
+import com.chrionline.client.model.ProductDTO;
+import com.chrionline.client.model.UserDTO;
 import com.chrionline.client.service.AdminService;
 import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.service.ProductService;
 import com.chrionline.client.util.UIUtils;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class AdminView extends VBox {
     private final AdminService adminService = new AdminService();
@@ -23,6 +40,7 @@ public class AdminView extends VBox {
     private final Label productsCount = new Label("0");
     private final Label usersCount = new Label("0");
     private final Label ordersCount = new Label("0");
+    private final VBox chartsSection = new VBox(16);
 
     public AdminView() {
         if (!AdminViewSupport.ensureAdmin()) {
@@ -77,8 +95,9 @@ public class AdminView extends VBox {
 
         welcomeCard.getChildren().addAll(welcomeTitle, welcomeText, quickActions);
         VBox notificationsCard = createNotificationsCard();
+        chartsSection.getChildren().add(createPlaceholderCard("Chargement des graphiques..."));
 
-        content.getChildren().addAll(stats, welcomeCard, capabilitiesCard, notificationsCard);
+        content.getChildren().addAll(stats, welcomeCard, chartsSection, capabilitiesCard, notificationsCard);
 
         getChildren().add(AdminViewSupport.createAdminPage(
                 "Dashboard administrateur",
@@ -88,6 +107,7 @@ public class AdminView extends VBox {
         ));
 
         loadCounts();
+        loadCharts();
     }
 
     private Label createBullet(String text) {
@@ -104,6 +124,35 @@ public class AdminView extends VBox {
             ordersCount.setText(String.valueOf(adminService.getOrders().size()));
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void loadCharts() {
+        try {
+            List<ProductDTO> products = productService.getAll();
+            List<UserDTO> users = adminService.getUsers();
+            List<OrderDTO> orders = adminService.getOrders();
+
+            VBox titleBlock = new VBox(6);
+            Label title = new Label("Visualisations");
+            title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+            Label subtitle = new Label("Un apercu rapide des commandes, du catalogue et de l'activite recente.");
+            subtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
+            titleBlock.getChildren().addAll(title, subtitle);
+
+            FlowPane topCharts = new FlowPane();
+            topCharts.setHgap(16);
+            topCharts.setVgap(16);
+            topCharts.getChildren().addAll(
+                    createOrdersStatusChart(orders),
+                    createStockChart(products),
+                    createUsersChart(users)
+            );
+
+            VBox bottomChart = createOrdersTimelineChart(orders);
+            chartsSection.getChildren().setAll(titleBlock, topCharts, bottomChart);
+        } catch (Exception e) {
+            chartsSection.getChildren().setAll(createPlaceholderCard("Impossible de charger les graphiques."));
         }
     }
 
@@ -157,5 +206,139 @@ public class AdminView extends VBox {
         box.setPadding(new Insets(12));
         box.setStyle("-fx-background-color: rgba(255,255,255,0.82); -fx-background-radius: 16;");
         return box;
+    }
+
+    private VBox createOrdersStatusChart(List<OrderDTO> orders) {
+        Map<String, Long> counts = orders.stream()
+                .collect(Collectors.groupingBy(
+                        order -> order.getStatut() == null || order.getStatut().isBlank() ? "Inconnu" : order.getStatut(),
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ));
+
+        List<PieChart.Data> data = new ArrayList<>();
+        counts.forEach((status, count) -> data.add(new PieChart.Data(status + " (" + count + ")", count)));
+
+        PieChart chart = new PieChart(FXCollections.observableArrayList(data));
+        chart.setLegendVisible(false);
+        chart.setLabelsVisible(true);
+        chart.setPrefSize(320, 280);
+
+        return wrapChart("Commandes par statut", "Vue immediate des statuts en cours.", chart, 340);
+    }
+
+    private VBox createStockChart(List<ProductDTO> products) {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Produits");
+
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setCategoryGap(18);
+        chart.setBarGap(10);
+        chart.setPrefSize(360, 280);
+
+        long rupture = products.stream().filter(product -> product.getStock() <= 0).count();
+        long stockFaible = products.stream().filter(product -> product.getStock() > 0 && product.getStock() <= 5).count();
+        long disponibles = products.stream().filter(product -> product.getStock() > 5).count();
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.getData().add(new XYChart.Data<>("Rupture", rupture));
+        series.getData().add(new XYChart.Data<>("Stock faible", stockFaible));
+        series.getData().add(new XYChart.Data<>("Disponibles", disponibles));
+        chart.getData().add(series);
+
+        return wrapChart("Etat du stock", "Repartition rapide du catalogue par disponibilite.", chart, 380);
+    }
+
+    private VBox createUsersChart(List<UserDTO> users) {
+        long admins = users.stream().filter(UserDTO::isAdmin).count();
+        long clients = users.size() - admins;
+        long suspendus = users.stream().filter(user -> "SUSPENDU".equalsIgnoreCase(user.getStatut())).count();
+
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setPrefSize(320, 280);
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.getData().add(new XYChart.Data<>("Clients", clients));
+        series.getData().add(new XYChart.Data<>("Admins", admins));
+        series.getData().add(new XYChart.Data<>("Suspendus", suspendus));
+        chart.getData().add(series);
+
+        return wrapChart("Utilisateurs", "Roles et comptes suspendus en un coup d'oeil.", chart, 340);
+    }
+
+    private VBox createOrdersTimelineChart(List<OrderDTO> orders) {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Commandes");
+
+        LineChart<String, Number> chart = new LineChart<>(xAxis, yAxis);
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setCreateSymbols(true);
+        chart.setPrefSize(1080, 320);
+
+        Map<String, Long> byDay = orders.stream()
+                .filter(order -> order.getDateCommande() != null)
+                .collect(Collectors.groupingBy(
+                        order -> new SimpleDateFormat("dd/MM").format(order.getDateCommande()),
+                        LinkedHashMap::new,
+                        Collectors.counting()
+                ));
+
+        List<Map.Entry<String, Long>> entries = byDay.entrySet().stream()
+                .sorted(Comparator.comparing(entry -> parseDay(entry.getKey())))
+                .toList();
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        for (Map.Entry<String, Long> entry : entries) {
+            series.getData().add(new XYChart.Data<>(entry.getKey(), entry.getValue()));
+        }
+        chart.getData().add(series);
+
+        return wrapChart(
+                "Evolution recente des commandes",
+                "Courbe simple des commandes par jour selon les donnees disponibles.",
+                chart,
+                1120
+        );
+    }
+
+    private VBox wrapChart(String title, String subtitle, javafx.scene.Node chart, double width) {
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+
+        Label subtitleLabel = new Label(subtitle);
+        subtitleLabel.setWrapText(true);
+        subtitleLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #5b5f63;");
+
+        VBox box = new VBox(10, titleLabel, subtitleLabel, chart);
+        box.setPadding(new Insets(18));
+        box.setPrefWidth(width);
+        box.setStyle(ViewFactory.cardStyle());
+        return box;
+    }
+
+    private VBox createPlaceholderCard(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 14px; -fx-text-fill: #5b5f63;");
+        VBox box = new VBox(label);
+        box.setPadding(new Insets(18));
+        box.setStyle(ViewFactory.cardStyle());
+        return box;
+    }
+
+    private Date parseDay(String day) {
+        try {
+            return new SimpleDateFormat("dd/MM").parse(day);
+        } catch (Exception e) {
+            return new Date(0);
+        }
     }
 }
