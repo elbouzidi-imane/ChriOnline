@@ -3,6 +3,7 @@ package com.chrionline.client.service;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.CancellationConfigDTO;
 import com.chrionline.client.model.CancellationResultDTO;
+import com.chrionline.client.model.PromoValidationResultDTO;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.util.JsonUtils;
@@ -16,8 +17,9 @@ import java.util.List;
 public class OrderService {
     private final TCPClient tcp = TCPClient.getInstance();
 
-    public String placeOrder(String adresse, String modePaiement, String modeLivraison) throws Exception {
-        String payload = AppSession.getCurrentUser().getId() + "|" + adresse + "|" + modePaiement + "|" + modeLivraison;
+    public String placeOrder(String adresse, String modePaiement, String modeLivraison, String promoCode) throws Exception {
+        String payload = AppSession.getCurrentUser().getId() + "|" + adresse + "|" + modePaiement + "|" + modeLivraison
+                + "|" + (promoCode == null ? "" : promoCode.trim());
         Message response = tcp.send(new Message(Protocol.PLACE_ORDER, payload));
         if (response.isError()) {
             throw new IllegalStateException(response.getPayload());
@@ -66,5 +68,14 @@ public class OrderService {
             throw new IllegalStateException(response.getPayload());
         }
         return JsonUtils.GSON.fromJson(response.getPayload(), CancellationResultDTO.class);
+    }
+
+    public PromoValidationResultDTO applyPromo(double cartTotal, String promoCode) throws Exception {
+        String payload = AppSession.getCurrentUser().getId() + "|" + cartTotal + "|" + promoCode;
+        Message response = tcp.send(new Message(Protocol.APPLY_PROMO, payload));
+        if (response.isError()) {
+            throw new IllegalStateException(response.getPayload());
+        }
+        return JsonUtils.GSON.fromJson(response.getPayload(), PromoValidationResultDTO.class);
     }
 }

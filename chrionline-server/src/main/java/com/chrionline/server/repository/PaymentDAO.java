@@ -27,7 +27,7 @@ public class PaymentDAO {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 payment.setId(rs.getInt("id"));
-                payment.setDatePaiement(rs.getDate("date_paiement"));
+                payment.setDatePaiement(rs.getTimestamp("date_paiement"));
             }
             return payment;
         } catch (Exception e) {
@@ -49,7 +49,7 @@ public class PaymentDAO {
                 p.setMontant(rs.getDouble("montant"));
                 p.setModePaiement(rs.getString("mode_paiement"));
                 p.setStatut(rs.getString("statut"));
-                p.setDatePaiement(rs.getDate("date_paiement"));
+                p.setDatePaiement(rs.getTimestamp("date_paiement"));
                 p.setReference(rs.getString("reference"));
                 return p;
             }

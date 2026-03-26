@@ -4,6 +4,8 @@ import com.chrionline.client.model.CategoryDTO;
 import com.chrionline.client.model.CancellationConfigDTO;
 import com.chrionline.client.model.OrderDTO;
 import com.chrionline.client.model.PaymentDTO;
+import com.chrionline.client.model.PromoCodeDTO;
+import com.chrionline.client.model.PromoUsageStatDTO;
 import com.chrionline.client.model.ProductDTO;
 import com.chrionline.client.model.ProductSizeDTO;
 import com.chrionline.client.model.UserDTO;
@@ -156,6 +158,37 @@ public class AdminService {
         Message response = sendAdmin(Protocol.ADMIN_GET_CATEGORIES, "");
         Type listType = new TypeToken<List<CategoryDTO>>() { }.getType();
         return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public void addPromo(String code, String reductionType, double reductionValue, double minimumOrderAmount,
+                         String startDate, String endDate, int maxUses, int maxUsagePerUser) throws Exception {
+        sendAdmin(
+                Protocol.ADMIN_ADD_PROMO,
+                String.join("|",
+                        code,
+                        reductionType,
+                        String.valueOf(reductionValue),
+                        String.valueOf(minimumOrderAmount),
+                        startDate,
+                        endDate,
+                        String.valueOf(maxUses),
+                        String.valueOf(maxUsagePerUser))
+        );
+    }
+
+    public List<PromoCodeDTO> getPromos() throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_PROMOS, "");
+        Type listType = new TypeToken<List<PromoCodeDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
+    public PromoUsageStatDTO getPromoStats(String code) throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_PROMO_STATS, code);
+        return JsonUtils.GSON.fromJson(response.getPayload(), PromoUsageStatDTO.class);
+    }
+
+    public void togglePromo(int promoId, boolean active) throws Exception {
+        sendAdmin(Protocol.ADMIN_TOGGLE_PROMO, promoId + "|" + active);
     }
 
     private Message sendAdmin(String type, String data) throws Exception {

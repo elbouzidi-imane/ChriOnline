@@ -7,6 +7,8 @@ import com.chrionline.server.model.Category;
 import com.chrionline.server.model.GuideTaille;
 import com.chrionline.server.model.Order;
 import com.chrionline.server.model.Payment;
+import com.chrionline.server.model.PromoCode;
+import com.chrionline.server.model.PromoUsageStat;
 import com.chrionline.server.model.Product;
 import com.chrionline.server.model.ProductSize;
 import com.chrionline.server.model.User;
@@ -16,6 +18,7 @@ import com.chrionline.server.repository.SizeDAO;
 import com.chrionline.server.service.CancellationConfigService;
 import com.chrionline.server.service.OrderService;
 import com.chrionline.server.service.PaymentService;
+import com.chrionline.server.service.PromoService;
 import com.chrionline.server.service.ProductService;
 import com.chrionline.server.service.UserService;
 import com.google.gson.Gson;
@@ -28,6 +31,7 @@ public class AdminHandler {
     private final UserService userService = new UserService();
     private final OrderService orderService = new OrderService();
     private final PaymentService paymentService = new PaymentService();
+    private final PromoService promoService = new PromoService();
     private final GuideDAO guideDAO = new GuideDAO();
     private final SizeDAO sizeDAO = new SizeDAO();
     private final CategoryDAO categoryDAO = new CategoryDAO();
@@ -68,6 +72,10 @@ public class AdminHandler {
 
             case Protocol.ADMIN_GET_PAYMENT -> handleGetPayment(request);
             case Protocol.ADMIN_REMBOURSE -> handleRembourse(request);
+            case Protocol.ADMIN_ADD_PROMO -> handleAddPromo(request);
+            case Protocol.ADMIN_GET_PROMOS -> handleGetPromos();
+            case Protocol.ADMIN_GET_PROMO_STATS -> handleGetPromoStats(request);
+            case Protocol.ADMIN_TOGGLE_PROMO -> handleTogglePromo(request);
 
             default -> Message.error("Type non gere par AdminHandler");
         };
@@ -463,6 +471,76 @@ public class AdminHandler {
                     Protocol.ADMIN_REMBOURSE,
                     approved ? "Remboursement confirme et email envoye" : "Remboursement refuse et email envoye"
             );
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleAddPromo(Message req) {
+        try {
+            String[] parts = getData(req).split("\\|", -1);
+            if (parts.length < 8) {
+                return Message.error("Format invalide");
+            }
+
+            PromoCode promo = new PromoCode();
+            promo.setCode(parts[0].trim().toUpperCase());
+            promo.setReductionType(parts[1].trim());
+            promo.setReductionValue(Double.parseDouble(parts[2].trim()));
+            promo.setMinimumOrderAmount(Double.parseDouble(parts[3].trim()));
+            promo.setStartDate(java.sql.Date.valueOf(parts[4].trim()));
+            promo.setEndDate(java.sql.Date.valueOf(parts[5].trim()));
+            promo.setMaxUses(Integer.parseInt(parts[6].trim()));
+            promo.setMaxUsagePerUser(Integer.parseInt(parts[7].trim()));
+            promo.setActive(true);
+
+            if (promoService.existsByCode(promo.getCode())) {
+                return Message.error("Ce code promo existe deja.");
+            }
+            if (promo.getEndDate().before(promo.getStartDate())) {
+                return Message.error("La date d'expiration doit etre apres la date de debut.");
+            }
+
+            PromoCode saved = promoService.addPromo(promo);
+            if (saved == null) {
+                return Message.error("Impossible d'ajouter le code promo. Verifiez le code, les dates ou l'unicite.");
+            }
+            return Message.ok(Protocol.ADMIN_ADD_PROMO, gson.toJson(saved));
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleGetPromos() {
+        try {
+            return Message.ok(Protocol.ADMIN_GET_PROMOS, gson.toJson(promoService.getPromos()));
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleGetPromoStats(Message req) {
+        try {
+            PromoUsageStat stat = promoService.getPromoStats(getData(req).trim());
+            if (stat == null) {
+                return Message.error("Code promo introuvable");
+            }
+            return Message.ok(Protocol.ADMIN_GET_PROMO_STATS, gson.toJson(stat));
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleTogglePromo(Message req) {
+        try {
+            String[] parts = getData(req).split("\\|", -1);
+            int promoId = Integer.parseInt(parts[0].trim());
+            boolean active = Boolean.parseBoolean(parts[1].trim());
+            boolean ok = promoService.togglePromo(promoId, active);
+            if (!ok) {
+                return Message.error("Code promo introuvable");
+            }
+            return Message.ok(Protocol.ADMIN_TOGGLE_PROMO, "Statut du code promo mis a jour");
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
         }

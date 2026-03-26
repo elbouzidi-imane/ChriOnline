@@ -31,7 +31,7 @@ public class OrderDAO {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 order.setId(rs.getInt("id"));
-                order.setDateCommande(rs.getDate("date_commande"));
+                order.setDateCommande(rs.getTimestamp("date_commande"));
             }
             return order;
         } catch (Exception e) {
@@ -177,7 +177,7 @@ public class OrderDAO {
         o.setId(rs.getInt("id"));
         o.setReference(rs.getString("reference"));
         o.setUtilisateurId(rs.getInt("utilisateur_id"));
-        o.setDateCommande(rs.getDate("date_commande"));
+        o.setDateCommande(rs.getTimestamp("date_commande"));
         o.setStatut(rs.getString("statut"));
         o.setMontantTotal(rs.getDouble("montant_total"));
         o.setAdresseLivraison(rs.getString("adresse_livraison"));

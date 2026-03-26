@@ -2,6 +2,7 @@ package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.CartDTO;
 import com.chrionline.client.model.CartLineDTO;
+import com.chrionline.client.model.PromoValidationResultDTO;
 import com.chrionline.client.service.CartService;
 import com.chrionline.client.service.OrderService;
 import com.chrionline.client.session.AppSession;
@@ -40,6 +41,11 @@ import java.util.stream.IntStream;
 public class CheckoutView extends ScrollPane {
     private final CartService cartService = new CartService();
     private final OrderService orderService = new OrderService();
+    private PromoValidationResultDTO appliedPromo;
+    private final Label subtotalLabel = new Label();
+    private final Label discountLabel = new Label("- 0.00 DH");
+    private final Label totalLabel = new Label();
+    private final Label promoFeedbackLabel = new Label("Ajoutez un code promo si vous en avez un.");
 
     private final TextField cardNumberField = createField("Numero de carte bancaire");
     private final TextField cardHolderField = createField("Nom sur la carte");
@@ -105,6 +111,7 @@ public class CheckoutView extends ScrollPane {
         });
 
         TextField addressField = createField("Adresse de livraison");
+        TextField promoField = createField("Code promo");
         if (AppSession.isLoggedIn() && AppSession.getCurrentUser().getAdresse() != null) {
             addressField.setText(AppSession.getCurrentUser().getAdresse());
         }
@@ -121,8 +128,10 @@ public class CheckoutView extends ScrollPane {
         expiryYearBox.setPromptText("Annee d'expiration");
         expiryMonthBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
         expiryYearBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
-        expiryMonthBox.setPrefWidth(190);
-        expiryYearBox.setPrefWidth(140);
+        expiryMonthBox.setPrefWidth(220);
+        expiryYearBox.setPrefWidth(160);
+        expiryMonthBox.setMaxWidth(Double.MAX_VALUE);
+        expiryYearBox.setMaxWidth(Double.MAX_VALUE);
         expiryMonthBox.setCellFactory(ignored -> new ListCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -198,7 +207,12 @@ public class CheckoutView extends ScrollPane {
             }
 
             try {
-                String reference = orderService.placeOrder(addressField.getText().trim(), paymentBox.getValue(), deliveryBox.getValue());
+                String reference = orderService.placeOrder(
+                        addressField.getText().trim(),
+                        paymentBox.getValue(),
+                        deliveryBox.getValue(),
+                        appliedPromo == null ? "" : appliedPromo.getCode()
+                );
                 cartService.clearCart();
                 UIUtils.showSuccess("Commande " + reference + " confirmee !");
                 NavigationManager.navigateTo(new ProductListView());
@@ -209,6 +223,10 @@ public class CheckoutView extends ScrollPane {
 
         VBox formCard = new VBox(12,
                 new Label("Adresse de livraison"), addressField,
+                new Separator(),
+                new Label("Code promo"),
+                createPromoRow(promoField),
+                promoFeedbackLabel,
                 new Separator(),
                 new Label("Mode de paiement"), paymentBox,
                 paymentDetailsBox,
@@ -231,13 +249,33 @@ public class CheckoutView extends ScrollPane {
             summaryText.setWrapText(true);
             summaryText.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
-            Label totalLabel = new Label(PriceUtils.formatMad(cart.getTotal()));
+            subtotalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+            subtotalLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+            discountLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #d9485f;");
+            totalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
             totalLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+            promoFeedbackLabel.setWrapText(true);
+            promoFeedbackLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #256c54;");
 
+            Label subtotalHint = new Label("Sous-total");
+            subtotalHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
+            Label discountHint = new Label("Reduction");
+            discountHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
             Label totalHint = new Label("Total a payer");
             totalHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
 
-            VBox summaryCard = new VBox(12, orderSummary, summaryText, summaryList, totalHint, totalLabel);
+            VBox summaryCard = new VBox(
+                    12,
+                    orderSummary,
+                    summaryText,
+                    summaryList,
+                    subtotalHint,
+                    subtotalLabel,
+                    discountHint,
+                    discountLabel,
+                    totalHint,
+                    totalLabel
+            );
             summaryCard.setPadding(new Insets(18));
             summaryCard.setStyle(ViewFactory.cardStyle());
             HBox.setHgrow(summaryCard, Priority.ALWAYS);
@@ -249,6 +287,41 @@ public class CheckoutView extends ScrollPane {
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
             NavigationManager.navigateTo(new CartView());
+        }
+    }
+
+    private HBox createPromoRow(TextField promoField) {
+        Button applyButton = ViewFactory.createSecondaryButton("Appliquer");
+        applyButton.setOnAction(event -> applyPromo(promoField));
+        HBox row = new HBox(10, promoField, applyButton);
+        HBox.setHgrow(promoField, Priority.ALWAYS);
+        return row;
+    }
+
+    private void applyPromo(TextField promoField) {
+        String code = promoField.getText().trim();
+        if (code.isEmpty()) {
+            UIUtils.showError("Saisissez un code promo.");
+            return;
+        }
+        try {
+            CartDTO cart = cartService.getCart();
+            appliedPromo = orderService.applyPromo(cart.getTotal(), code);
+            subtotalLabel.setText(PriceUtils.formatMad(appliedPromo.getOriginalTotal()));
+            discountLabel.setText("- " + PriceUtils.formatMad(appliedPromo.getDiscountAmount()));
+            totalLabel.setText(PriceUtils.formatMad(appliedPromo.getFinalTotal()));
+            promoFeedbackLabel.setText(appliedPromo.getMessage() + " Code applique : " + appliedPromo.getCode());
+        } catch (Exception e) {
+            appliedPromo = null;
+            discountLabel.setText("- 0.00 DH");
+            try {
+                CartDTO cart = cartService.getCart();
+                subtotalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+                totalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+            } catch (Exception ignored) {
+            }
+            promoFeedbackLabel.setText("Code promo non applique.");
+            UIUtils.showError(e.getMessage());
         }
     }
 
@@ -295,13 +368,14 @@ public class CheckoutView extends ScrollPane {
         grid.add(cardHolderField, 0, 2, 2, 1);
         grid.add(new Label("Numero de carte"), 0, 3);
         grid.add(cardNumberField, 0, 4, 2, 1);
-        grid.add(new Label("Expiration"), 0, 5);
-        HBox expiryRow = new HBox(10, expiryMonthBox, expiryYearBox);
+        grid.add(new Label("Mois d'expiration"), 0, 5);
+        grid.add(new Label("Annee d'expiration"), 1, 5);
+        HBox expiryRow = new HBox(12, expiryMonthBox, expiryYearBox);
         HBox.setHgrow(expiryMonthBox, Priority.ALWAYS);
         HBox.setHgrow(expiryYearBox, Priority.ALWAYS);
-        grid.add(expiryRow, 0, 6);
-        grid.add(new Label("CVV"), 1, 5);
-        grid.add(cvvField, 1, 6);
+        grid.add(expiryRow, 0, 6, 2, 1);
+        grid.add(new Label("CVV"), 0, 7);
+        grid.add(cvvField, 0, 8, 2, 1);
 
         GridPane.setHgrow(cardHolderField, Priority.ALWAYS);
         GridPane.setHgrow(cardNumberField, Priority.ALWAYS);

@@ -14,10 +14,11 @@ public class OrderService {
     private final PaymentDAO   paymentDAO   = new PaymentDAO();
     private final PaymentService paymentService = new PaymentService();
     private final LivraisonDAO livraisonDAO = new LivraisonDAO();
+    private final PromoService promoService = new PromoService();
 
     // ── Valider une commande ──────────────────────────
     public Order validerCommande(int userId, String adresse,
-                                 String modePaiement, String modeLivraison) {
+                                 String modePaiement, String modeLivraison, String promoCode) {
 
         // 1. Récupérer le panier
         Cart cart = cartDAO.getOrCreateCart(userId);
@@ -49,7 +50,18 @@ public class OrderService {
         }
 
         // 3. Calculer le total
-        double total = cart.getTotal();
+        double originalTotal = cart.getTotal();
+        double total = originalTotal;
+        double discountAmount = 0;
+        String normalizedPromoCode = promoCode == null ? "" : promoCode.trim();
+        if (!normalizedPromoCode.isEmpty()) {
+            PromoValidationResult promoResult = promoService.validatePromo(normalizedPromoCode, originalTotal, userId);
+            if (!promoResult.isValid()) {
+                return null;
+            }
+            total = promoResult.getFinalTotal();
+            discountAmount = promoResult.getDiscountAmount();
+        }
 
         // 4. Créer la commande avec référence temporaire
         Order order = new Order(userId, total, adresse);
@@ -101,6 +113,10 @@ public class OrderService {
         // 10. Mettre à jour le statut → VALIDEE
         orderDAO.updateStatut(order.getId(), "VALIDEE");
         order.setStatut("VALIDEE");
+
+        if (!normalizedPromoCode.isEmpty() && discountAmount > 0) {
+            promoService.registerUsage(normalizedPromoCode, userId, order.getId(), discountAmount);
+        }
 
         return order;
     }
