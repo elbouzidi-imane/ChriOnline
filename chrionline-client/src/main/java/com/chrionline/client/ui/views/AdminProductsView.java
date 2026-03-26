@@ -21,16 +21,27 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.stage.FileChooser;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
 
 public class AdminProductsView extends VBox {
+    private static final Path PRODUCT_IMAGES_DIR = Path.of(System.getProperty("user.dir"), "product-images");
     private final AdminService adminService = new AdminService();
     private final ProductService productService = new ProductService();
     private final TableView<ProductDTO> productsTable = new TableView<>();
@@ -467,7 +478,33 @@ public class AdminProductsView extends VBox {
         TextField couleurField = new TextField(product == null ? "" : nullToEmpty(product.getCouleur()));
         TextField prixOriginalField = new TextField(product == null ? "" : String.valueOf(product.getPrixOriginal()));
         TextField prixReduitField = new TextField(product == null ? "" : String.valueOf(product.getPrixReduit()));
-        TextField imageUrlField = new TextField(product == null ? "" : nullToEmpty(product.getImageUrl()));
+        TextField imagePathField = new TextField(product == null ? "" : nullToEmpty(product.getImageUrl()));
+        imagePathField.setEditable(false);
+        imagePathField.setPromptText("Aucune image importee");
+
+        StackPane imagePreview = createImagePreview(imagePathField.getText());
+
+        Button importImageButton = ViewFactory.createSecondaryButton("Importer image");
+        importImageButton.setOnAction(event -> {
+            try {
+                String importedImage = importProductImage(dialog);
+                if (importedImage != null) {
+                    imagePathField.setText(importedImage);
+                    refreshImagePreview(imagePreview, importedImage);
+                }
+            } catch (Exception e) {
+                UIUtils.showError("Impossible d'importer l'image : " + e.getMessage());
+            }
+        });
+
+        Button clearImageButton = ViewFactory.createSecondaryButton("Retirer image");
+        clearImageButton.setOnAction(event -> {
+            imagePathField.clear();
+            refreshImagePreview(imagePreview, "");
+        });
+
+        HBox imageRow = new HBox(10, imagePathField, importImageButton, clearImageButton);
+        HBox.setHgrow(imagePathField, Priority.ALWAYS);
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
@@ -479,7 +516,8 @@ public class AdminProductsView extends VBox {
         grid.addRow(4, new Label("Couleur"), couleurField);
         grid.addRow(5, new Label("Prix original"), prixOriginalField);
         grid.addRow(6, new Label("Prix reduit"), prixReduitField);
-        grid.addRow(7, new Label("Image URL"), imageUrlField);
+        grid.addRow(7, new Label("Image"), imageRow);
+        grid.addRow(8, new Label("Apercu"), imagePreview);
         pane.setContent(grid);
 
         Optional<ButtonType> result = dialog.showAndWait();
@@ -518,8 +556,78 @@ public class AdminProductsView extends VBox {
         } else {
             data.prixReduit = "";
         }
-        data.imageUrl = imageUrlField.getText().trim();
+        data.imageUrl = imagePathField.getText().trim();
         return data;
+    }
+
+    private String importProductImage(Dialog<ButtonType> dialog) throws Exception {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Choisir une image produit");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.webp", "*.gif")
+        );
+
+        File selectedFile = chooser.showOpenDialog(dialog.getDialogPane().getScene().getWindow());
+        if (selectedFile == null) {
+            return null;
+        }
+
+        Files.createDirectories(PRODUCT_IMAGES_DIR);
+
+        String originalName = selectedFile.getName();
+        String extension = "";
+        int dotIndex = originalName.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = originalName.substring(dotIndex);
+        }
+
+        String safeName = "product-" + System.currentTimeMillis() + extension;
+        Path destination = PRODUCT_IMAGES_DIR.resolve(safeName);
+        Files.copy(selectedFile.toPath(), destination, StandardCopyOption.REPLACE_EXISTING);
+        return destination.toUri().toString();
+    }
+
+    private StackPane createImagePreview(String imageUrl) {
+        StackPane preview = new StackPane();
+        preview.setPrefSize(150, 150);
+        preview.setMinSize(150, 150);
+        preview.setMaxSize(150, 150);
+        preview.setStyle("-fx-background-color: rgba(255,250,245,0.95); -fx-background-radius: 22;");
+        refreshImagePreview(preview, imageUrl);
+        return preview;
+    }
+
+    private void refreshImagePreview(StackPane preview, String imageUrl) {
+        preview.getChildren().clear();
+
+        Rectangle bg = new Rectangle(150, 150);
+        bg.setArcWidth(24);
+        bg.setArcHeight(24);
+        bg.setFill(Color.web("#f3e6d8"));
+        preview.getChildren().add(bg);
+
+        if (imageUrl == null || imageUrl.isBlank()) {
+            Label placeholder = new Label("Aucune image");
+            placeholder.setStyle("-fx-font-size: 13px; -fx-text-fill: #7b6d62; -fx-font-weight: bold;");
+            preview.getChildren().add(placeholder);
+            return;
+        }
+
+        try {
+            Image image = new Image(imageUrl, 140, 140, true, true, true);
+            if (image.isError()) {
+                throw new IllegalArgumentException("Image invalide");
+            }
+            ImageView imageView = new ImageView(image);
+            imageView.setFitWidth(140);
+            imageView.setFitHeight(140);
+            imageView.setPreserveRatio(true);
+            preview.getChildren().add(imageView);
+        } catch (Exception e) {
+            Label placeholder = new Label("Apercu indisponible");
+            placeholder.setStyle("-fx-font-size: 13px; -fx-text-fill: #a94442; -fx-font-weight: bold;");
+            preview.getChildren().add(placeholder);
+        }
     }
 
     private String nullToEmpty(String value) {
