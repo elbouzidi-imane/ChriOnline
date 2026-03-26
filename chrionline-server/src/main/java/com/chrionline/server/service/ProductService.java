@@ -5,6 +5,7 @@ import com.chrionline.server.model.Product;
 import com.chrionline.server.repository.CategoryDAO;
 import com.chrionline.server.repository.ProductDAO;
 
+import java.util.Date;
 import java.util.List;
 
 public class ProductService {
@@ -66,6 +67,12 @@ public class ProductService {
         }
         if (product.getPrixOriginal() <= 0) {
             return null;
+        }
+        if (product.getStatut() == null || product.getStatut().isBlank()) {
+            product.setStatut("ACTIF");
+        }
+        if (product.getDateDebutVente() == null) {
+            product.setDateDebutVente(new Date());
         }
         return productDAO.save(product);
     }

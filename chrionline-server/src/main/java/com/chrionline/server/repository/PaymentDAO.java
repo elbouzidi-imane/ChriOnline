@@ -27,7 +27,7 @@ public class PaymentDAO {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 payment.setId(rs.getInt("id"));
-                payment.setDatePaiement(rs.getDate("date_paiement"));
+                payment.setDatePaiement(rs.getTimestamp("date_paiement"));
             }
             return payment;
         } catch (Exception e) {
@@ -49,7 +49,7 @@ public class PaymentDAO {
                 p.setMontant(rs.getDouble("montant"));
                 p.setModePaiement(rs.getString("mode_paiement"));
                 p.setStatut(rs.getString("statut"));
-                p.setDatePaiement(rs.getDate("date_paiement"));
+                p.setDatePaiement(rs.getTimestamp("date_paiement"));
                 p.setReference(rs.getString("reference"));
                 return p;
             }
@@ -57,5 +57,18 @@ public class PaymentDAO {
             System.err.println("PaymentDAO.findByCommande : " + e.getMessage());
         }
         return null;
+    }
+
+    public boolean updateStatut(int commandeId, String statut) {
+        String sql = "UPDATE paiement SET statut = ? WHERE commande_id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, statut);
+            ps.setInt(2, commandeId);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("PaymentDAO.updateStatut : " + e.getMessage());
+            return false;
+        }
     }
 }

@@ -12,11 +12,13 @@ public class OrderService {
     private final CartDAO      cartDAO      = new CartDAO();
     private final ProductDAO   productDAO   = new ProductDAO();
     private final PaymentDAO   paymentDAO   = new PaymentDAO();
+    private final PaymentService paymentService = new PaymentService();
     private final LivraisonDAO livraisonDAO = new LivraisonDAO();
-    private final UserDAO      userDAO      = new UserDAO();
+    private final PromoService promoService = new PromoService();
+
     // ── Valider une commande ──────────────────────────
     public Order validerCommande(int userId, String adresse,
-                                 String modePaiement, String modeLivraison) {
+                                 String modePaiement, String modeLivraison, String promoCode) {
 
         // 1. Récupérer le panier
         Cart cart = cartDAO.getOrCreateCart(userId);
@@ -48,7 +50,18 @@ public class OrderService {
         }
 
         // 3. Calculer le total
-        double total = cart.getTotal();
+        double originalTotal = cart.getTotal();
+        double total = originalTotal;
+        double discountAmount = 0;
+        String normalizedPromoCode = promoCode == null ? "" : promoCode.trim();
+        if (!normalizedPromoCode.isEmpty()) {
+            PromoValidationResult promoResult = promoService.validatePromo(normalizedPromoCode, originalTotal, userId);
+            if (!promoResult.isValid()) {
+                return null;
+            }
+            total = promoResult.getFinalTotal();
+            discountAmount = promoResult.getDiscountAmount();
+        }
 
         // 4. Créer la commande avec référence temporaire
         Order order = new Order(userId, total, adresse);
@@ -101,6 +114,10 @@ public class OrderService {
         orderDAO.updateStatut(order.getId(), "VALIDEE");
         order.setStatut("VALIDEE");
 
+        if (!normalizedPromoCode.isEmpty() && discountAmount > 0) {
+            promoService.registerUsage(normalizedPromoCode, userId, order.getId(), discountAmount);
+        }
+
         return order;
     }
 
@@ -122,6 +139,63 @@ public class OrderService {
     // ── Changer le statut (admin) ─────────────────────
     public boolean updateStatut(int id, String statut) {
         return orderDAO.updateStatut(id, statut);
+    }
+
+    public CancellationConfig getCancellationConfig() {
+        return CancellationConfigService.getConfig();
+    }
+
+    public CancellationResult cancelOrder(int userId, int orderId, String reason) {
+        Order order = orderDAO.findById(orderId);
+        if (order == null || order.getUtilisateurId() != userId) {
+            return null;
+        }
+
+        CancellationConfig config = CancellationConfigService.getConfig();
+        if (!config.getCancellableStatus().equals(order.getStatut())) {
+            return null;
+        }
+        if (config.isReasonRequired() && (reason == null || reason.isBlank())) {
+            return null;
+        }
+
+        for (OrderLine line : order.getLignes()) {
+            Product product = productDAO.findById(line.getProduitId());
+            if (product == null) {
+                continue;
+            }
+            for (ProductSize size : product.getTailles()) {
+                if (size.getId() == line.getTailleId()) {
+                    productDAO.updateStock(size.getId(), size.getStock() + line.getQuantite());
+                    break;
+                }
+            }
+        }
+
+        orderDAO.updateCancellationInfo(orderId, "ANNULEE", reason);
+        order.setStatut("ANNULEE");
+        order.setMotifAnnulation(reason);
+
+        String refundMessage;
+        if (config.isAutomaticRefund()) {
+            boolean refunded = paymentDAO.findByCommande(orderId) != null && paymentService.rembourser(orderId);
+            refundMessage = refunded
+                    ? "Remboursement automatique lance."
+                    : "Remboursement automatique en attente de traitement.";
+        } else {
+            if (paymentDAO.findByCommande(orderId) != null) {
+                paymentDAO.updateStatut(orderId, "EN_ATTENTE");
+            }
+            refundMessage = "Remboursement manuel prevu par l'administration.";
+        }
+
+        return new CancellationResult(
+                order.getReference(),
+                "ANNULEE",
+                "Commande annulee avec succes.",
+                refundMessage,
+                config.getEstimatedRefundDelay()
+        );
     }
 
     // ── Mettre à jour la référence en BDD ─────────────

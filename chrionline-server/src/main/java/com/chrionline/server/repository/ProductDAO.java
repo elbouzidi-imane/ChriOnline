@@ -163,12 +163,38 @@ public class ProductDAO {
 
     // ── Mettre à jour le stock d'une taille ───────────
     public boolean updateStock(int tailleId, int newStock) {
-        String sql = "UPDATE taille_produit SET stock = ? WHERE id = ?";
+        String sizeSql = "UPDATE taille_produit SET stock = ? WHERE id = ?";
+        String productSql = """
+            UPDATE produit
+            SET stock = (
+                SELECT COALESCE(SUM(stock), 0)
+                FROM taille_produit
+                WHERE produit_id = (
+                    SELECT produit_id FROM taille_produit WHERE id = ?
+                )
+            )
+            WHERE id = (
+                SELECT produit_id FROM taille_produit WHERE id = ?
+            )
+            """;
         try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, newStock);
-            ps.setInt(2, tailleId);
-            return ps.executeUpdate() > 0;
+             PreparedStatement sizePs = conn.prepareStatement(sizeSql);
+             PreparedStatement productPs = conn.prepareStatement(productSql)) {
+            conn.setAutoCommit(false);
+
+            sizePs.setInt(1, newStock);
+            sizePs.setInt(2, tailleId);
+            boolean updated = sizePs.executeUpdate() > 0;
+            if (!updated) {
+                conn.rollback();
+                return false;
+            }
+
+            productPs.setInt(1, tailleId);
+            productPs.setInt(2, tailleId);
+            productPs.executeUpdate();
+            conn.commit();
+            return true;
         } catch (Exception e) {
             System.err.println("ProductDAO.updateStock : " + e.getMessage());
             return false;

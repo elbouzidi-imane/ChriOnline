@@ -12,6 +12,7 @@ public class OrderDTO {
     private String statut;
     private double montantTotal;
     private String adresseLivraison;
+    private String motifAnnulation;
     private List<OrderLineDTO> lignes = new ArrayList<>();
 
     public int getId() {
@@ -40,6 +41,10 @@ public class OrderDTO {
 
     public String getAdresseLivraison() {
         return adresseLivraison;
+    }
+
+    public String getMotifAnnulation() {
+        return motifAnnulation;
     }
 
     public List<OrderLineDTO> getLignes() {

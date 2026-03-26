@@ -7,6 +7,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -48,12 +49,12 @@ final class AdminViewSupport {
 
         VBox heading = new VBox(8, badge, titleLabel, subtitleLabel);
 
-        HBox nav = createAdminNav(activeSection);
+        VBox nav = createAdminNav(activeSection);
         page.getChildren().addAll(heading, nav, body);
         return scrollPane;
     }
 
-    static HBox createAdminNav(String activeSection) {
+    static VBox createAdminNav(String activeSection) {
         Button dashboardButton = createNavButton("Dashboard", "dashboard".equals(activeSection));
         dashboardButton.setOnAction(event -> NavigationManager.navigateTo(new AdminView()));
 
@@ -65,6 +66,9 @@ final class AdminViewSupport {
 
         Button ordersButton = createNavButton("Commandes", "orders".equals(activeSection));
         ordersButton.setOnAction(event -> NavigationManager.navigateTo(new AdminOrdersView()));
+
+        Button promosButton = createNavButton("Promos", "promos".equals(activeSection));
+        promosButton.setOnAction(event -> NavigationManager.navigateTo(new AdminPromosView()));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -81,8 +85,15 @@ final class AdminViewSupport {
             NavigationManager.navigateTo(new LoginView());
         });
 
-        HBox nav = new HBox(10, dashboardButton, productsButton, usersButton, ordersButton, spacer, emailLabel, homeButton, logoutButton);
-        nav.setAlignment(Pos.CENTER_LEFT);
+        FlowPane actions = new FlowPane();
+        actions.setHgap(10);
+        actions.setVgap(10);
+        actions.getChildren().addAll(dashboardButton, productsButton, usersButton, ordersButton, promosButton);
+
+        HBox accountBar = new HBox(10, spacer, emailLabel, homeButton, logoutButton);
+        accountBar.setAlignment(Pos.CENTER_LEFT);
+
+        VBox nav = new VBox(10, actions, accountBar);
         return nav;
     }
 
@@ -110,6 +121,7 @@ final class AdminViewSupport {
                 + "-fx-background-radius: 16; -fx-padding: 11 18 11 18;"
                 : "-fx-background-color: rgba(255,255,255,0.94); -fx-text-fill: #12372e; -fx-font-weight: bold; "
                 + "-fx-background-radius: 16; -fx-padding: 11 18 11 18;");
+        button.setMinWidth(120);
         return button;
     }
 }

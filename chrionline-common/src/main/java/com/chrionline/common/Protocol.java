@@ -32,6 +32,9 @@ public class Protocol {
     public static final String PLACE_ORDER = "PLACE_ORDER";
     public static final String GET_ORDERS  = "GET_ORDERS";
     public static final String GET_ORDER   = "GET_ORDER";
+    public static final String CANCEL_ORDER = "CANCEL_ORDER";
+    public static final String GET_CANCELLATION_CONFIG = "GET_CANCELLATION_CONFIG";
+    public static final String APPLY_PROMO = "APPLY_PROMO";
 
     // ── Paiement ──────────────────────────────────────
     public static final String PAY = "PAY";
@@ -64,10 +67,16 @@ public class Protocol {
     public static final String ADMIN_GET_ORDERS          = "ADMIN_GET_ORDERS";
     public static final String ADMIN_GET_ORDER_DETAIL    = "ADMIN_GET_ORDER_DETAIL";
     public static final String ADMIN_UPDATE_ORDER_STATUT = "ADMIN_UPDATE_ORDER_STATUT";
+    public static final String ADMIN_UPDATE_CANCELLATION_CONFIG = "ADMIN_UPDATE_CANCELLATION_CONFIG";
+    public static final String ADMIN_GET_CANCELLATION_CONFIG = "ADMIN_GET_CANCELLATION_CONFIG";
 
     // ── Admin — Paiement ──────────────────────────────
     public static final String ADMIN_GET_PAYMENT = "ADMIN_GET_PAYMENT";
     public static final String ADMIN_REMBOURSE   = "ADMIN_REMBOURSE";
+    public static final String ADMIN_ADD_PROMO = "ADMIN_ADD_PROMO";
+    public static final String ADMIN_GET_PROMOS = "ADMIN_GET_PROMOS";
+    public static final String ADMIN_GET_PROMO_STATS = "ADMIN_GET_PROMO_STATS";
+    public static final String ADMIN_TOGGLE_PROMO = "ADMIN_TOGGLE_PROMO";
 
     // ── Réponses serveur ──────────────────────────────
     public static final String OK    = "OK";

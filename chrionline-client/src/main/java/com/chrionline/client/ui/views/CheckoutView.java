@@ -2,8 +2,10 @@ package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.CartDTO;
 import com.chrionline.client.model.CartLineDTO;
+import com.chrionline.client.model.PromoValidationResultDTO;
 import com.chrionline.client.service.CartService;
 import com.chrionline.client.service.OrderService;
+import com.chrionline.client.session.AppSession;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.PriceUtils;
 import com.chrionline.client.util.UIUtils;
@@ -20,6 +22,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextFormatter;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -28,16 +31,37 @@ import javafx.scene.layout.VBox;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.time.Year;
+import java.time.format.TextStyle;
+import java.util.Locale;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class CheckoutView extends ScrollPane {
     private final CartService cartService = new CartService();
     private final OrderService orderService = new OrderService();
+    private PromoValidationResultDTO appliedPromo;
+    private final Label subtotalLabel = new Label();
+    private final Label discountLabel = new Label("- 0.00 DH");
+    private final Label totalLabel = new Label();
+    private final Label promoFeedbackLabel = new Label("Ajoutez un code promo si vous en avez un.");
 
     private final TextField cardNumberField = createField("Numero de carte bancaire");
     private final TextField cardHolderField = createField("Nom sur la carte");
-    private final TextField expiryField = createField("Date d'expiration MM/AA");
     private final TextField cvvField = createField("Code CVV");
     private final TextField paypalEmailField = createField("Email PayPal");
+    private final ComboBox<String> expiryMonthBox = new ComboBox<>(FXCollections.observableArrayList(
+            IntStream.rangeClosed(1, 12)
+                    .mapToObj(month -> String.format("%02d - %s", month, java.time.Month.of(month)
+                            .getDisplayName(TextStyle.SHORT, Locale.FRENCH)))
+                    .collect(Collectors.toList())
+    ));
+    private final ComboBox<Integer> expiryYearBox = new ComboBox<>(FXCollections.observableArrayList(
+            IntStream.rangeClosed(Year.now().getValue(), Year.now().getValue() + 12)
+                    .boxed()
+                    .collect(Collectors.toList())
+    ));
 
     public CheckoutView() {
         VBox page = new VBox(18);
@@ -87,6 +111,10 @@ public class CheckoutView extends ScrollPane {
         });
 
         TextField addressField = createField("Adresse de livraison");
+        TextField promoField = createField("Code promo");
+        if (AppSession.isLoggedIn() && AppSession.getCurrentUser().getAdresse() != null) {
+            addressField.setText(AppSession.getCurrentUser().getAdresse());
+        }
 
         ComboBox<String> paymentBox = new ComboBox<>(FXCollections.observableArrayList("CARTE_BANCAIRE", "PAYPAL", "FICTIF"));
         paymentBox.setPromptText("Mode de paiement");
@@ -95,6 +123,31 @@ public class CheckoutView extends ScrollPane {
         ComboBox<String> deliveryBox = new ComboBox<>(FXCollections.observableArrayList("STANDARD", "EXPRESS", "POINT_RELAIS"));
         deliveryBox.setPromptText("Mode de livraison");
         deliveryBox.setStyle("-fx-background-radius: 14;");
+
+        expiryMonthBox.setPromptText("Mois d'expiration");
+        expiryYearBox.setPromptText("Annee d'expiration");
+        expiryMonthBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
+        expiryYearBox.setStyle("-fx-background-radius: 14; -fx-padding: 6 8 6 8;");
+        expiryMonthBox.setPrefWidth(220);
+        expiryYearBox.setPrefWidth(160);
+        expiryMonthBox.setMaxWidth(Double.MAX_VALUE);
+        expiryYearBox.setMaxWidth(Double.MAX_VALUE);
+        expiryMonthBox.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item);
+            }
+        });
+        expiryMonthBox.setButtonCell(expiryMonthBox.getCellFactory().call(null));
+        expiryYearBox.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(Integer item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : String.valueOf(item));
+            }
+        });
+        expiryYearBox.setButtonCell(expiryYearBox.getCellFactory().call(null));
 
         VBox paymentDetailsBox = new VBox(10);
         paymentDetailsBox.setPadding(new Insets(14));
@@ -126,6 +179,9 @@ public class CheckoutView extends ScrollPane {
             }
         });
 
+        applyDigitLimit(cardNumberField, 16);
+        applyDigitLimit(cvvField, 3);
+
         Button confirmButton = new Button("Confirmer la commande");
         confirmButton.setStyle("-fx-background-color: #eb8b1b; -fx-text-fill: white; -fx-font-weight: bold; "
                 + "-fx-background-radius: 16; -fx-padding: 13 18 13 18;");
@@ -151,7 +207,12 @@ public class CheckoutView extends ScrollPane {
             }
 
             try {
-                String reference = orderService.placeOrder(addressField.getText().trim(), paymentBox.getValue(), deliveryBox.getValue());
+                String reference = orderService.placeOrder(
+                        addressField.getText().trim(),
+                        paymentBox.getValue(),
+                        deliveryBox.getValue(),
+                        appliedPromo == null ? "" : appliedPromo.getCode()
+                );
                 cartService.clearCart();
                 UIUtils.showSuccess("Commande " + reference + " confirmee !");
                 NavigationManager.navigateTo(new ProductListView());
@@ -162,6 +223,10 @@ public class CheckoutView extends ScrollPane {
 
         VBox formCard = new VBox(12,
                 new Label("Adresse de livraison"), addressField,
+                new Separator(),
+                new Label("Code promo"),
+                createPromoRow(promoField),
+                promoFeedbackLabel,
                 new Separator(),
                 new Label("Mode de paiement"), paymentBox,
                 paymentDetailsBox,
@@ -184,13 +249,33 @@ public class CheckoutView extends ScrollPane {
             summaryText.setWrapText(true);
             summaryText.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
-            Label totalLabel = new Label(PriceUtils.formatMad(cart.getTotal()));
+            subtotalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+            subtotalLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
+            discountLabel.setStyle("-fx-font-size: 15px; -fx-font-weight: bold; -fx-text-fill: #d9485f;");
+            totalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
             totalLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #d97706;");
+            promoFeedbackLabel.setWrapText(true);
+            promoFeedbackLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #256c54;");
 
+            Label subtotalHint = new Label("Sous-total");
+            subtotalHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
+            Label discountHint = new Label("Reduction");
+            discountHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
             Label totalHint = new Label("Total a payer");
             totalHint.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
 
-            VBox summaryCard = new VBox(12, orderSummary, summaryText, summaryList, totalHint, totalLabel);
+            VBox summaryCard = new VBox(
+                    12,
+                    orderSummary,
+                    summaryText,
+                    summaryList,
+                    subtotalHint,
+                    subtotalLabel,
+                    discountHint,
+                    discountLabel,
+                    totalHint,
+                    totalLabel
+            );
             summaryCard.setPadding(new Insets(18));
             summaryCard.setStyle(ViewFactory.cardStyle());
             HBox.setHgrow(summaryCard, Priority.ALWAYS);
@@ -205,17 +290,49 @@ public class CheckoutView extends ScrollPane {
         }
     }
 
+    private HBox createPromoRow(TextField promoField) {
+        Button applyButton = ViewFactory.createSecondaryButton("Appliquer");
+        applyButton.setOnAction(event -> applyPromo(promoField));
+        HBox row = new HBox(10, promoField, applyButton);
+        HBox.setHgrow(promoField, Priority.ALWAYS);
+        return row;
+    }
+
+    private void applyPromo(TextField promoField) {
+        String code = promoField.getText().trim();
+        if (code.isEmpty()) {
+            UIUtils.showError("Saisissez un code promo.");
+            return;
+        }
+        try {
+            CartDTO cart = cartService.getCart();
+            appliedPromo = orderService.applyPromo(cart.getTotal(), code);
+            subtotalLabel.setText(PriceUtils.formatMad(appliedPromo.getOriginalTotal()));
+            discountLabel.setText("- " + PriceUtils.formatMad(appliedPromo.getDiscountAmount()));
+            totalLabel.setText(PriceUtils.formatMad(appliedPromo.getFinalTotal()));
+            promoFeedbackLabel.setText(appliedPromo.getMessage() + " Code applique : " + appliedPromo.getCode());
+        } catch (Exception e) {
+            appliedPromo = null;
+            discountLabel.setText("- 0.00 DH");
+            try {
+                CartDTO cart = cartService.getCart();
+                subtotalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+                totalLabel.setText(PriceUtils.formatMad(cart.getTotal()));
+            } catch (Exception ignored) {
+            }
+            promoFeedbackLabel.setText("Code promo non applique.");
+            UIUtils.showError(e.getMessage());
+        }
+    }
+
     private void validateCard() {
-        String cardNumber = cardNumberField.getText().replace(" ", "");
+        String cardNumber = cardNumberField.getText().trim();
         if (cardNumberField.getText().isBlank() || cardHolderField.getText().isBlank()
-                || expiryField.getText().isBlank() || cvvField.getText().isBlank()) {
+                || expiryMonthBox.getValue() == null || expiryYearBox.getValue() == null || cvvField.getText().isBlank()) {
             throw new IllegalArgumentException("Remplissez tous les champs de la carte bancaire.");
         }
         if (!cardNumber.matches("\\d{16}")) {
             throw new IllegalArgumentException("Le numero de carte doit contenir 16 chiffres.");
-        }
-        if (!expiryField.getText().trim().matches("(0[1-9]|1[0-2])/\\d{2}")) {
-            throw new IllegalArgumentException("La date d'expiration doit etre au format MM/AA.");
         }
         if (!cvvField.getText().trim().matches("\\d{3}")) {
             throw new IllegalArgumentException("Le code CVV doit contenir 3 chiffres.");
@@ -244,21 +361,24 @@ public class CheckoutView extends ScrollPane {
         grid.setHgap(12);
         grid.setVgap(12);
 
-        Label note = createInfoLabel("Les informations de carte sont verifiees localement avant l'envoi du paiement simule.");
+        Label note = createInfoLabel("Le numero de carte est limite a 16 chiffres, le CVV a 3 chiffres, et l'expiration se choisit directement.");
         grid.add(note, 0, 0, 2, 1);
 
         grid.add(new Label("Nom du titulaire"), 0, 1);
         grid.add(cardHolderField, 0, 2, 2, 1);
         grid.add(new Label("Numero de carte"), 0, 3);
         grid.add(cardNumberField, 0, 4, 2, 1);
-        grid.add(new Label("Expiration"), 0, 5);
-        grid.add(expiryField, 0, 6);
-        grid.add(new Label("CVV"), 1, 5);
-        grid.add(cvvField, 1, 6);
+        grid.add(new Label("Mois d'expiration"), 0, 5);
+        grid.add(new Label("Annee d'expiration"), 1, 5);
+        HBox expiryRow = new HBox(12, expiryMonthBox, expiryYearBox);
+        HBox.setHgrow(expiryMonthBox, Priority.ALWAYS);
+        HBox.setHgrow(expiryYearBox, Priority.ALWAYS);
+        grid.add(expiryRow, 0, 6, 2, 1);
+        grid.add(new Label("CVV"), 0, 7);
+        grid.add(cvvField, 0, 8, 2, 1);
 
         GridPane.setHgrow(cardHolderField, Priority.ALWAYS);
         GridPane.setHgrow(cardNumberField, Priority.ALWAYS);
-        GridPane.setHgrow(expiryField, Priority.ALWAYS);
         GridPane.setHgrow(cvvField, Priority.ALWAYS);
         GridPane.setHalignment(note, HPos.LEFT);
         return grid;
@@ -282,5 +402,16 @@ public class CheckoutView extends ScrollPane {
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
         }
+    }
+
+    private void applyDigitLimit(TextField field, int maxLength) {
+        UnaryOperator<TextFormatter.Change> filter = change -> {
+            String next = change.getControlNewText();
+            if (!next.matches("\\d{0," + maxLength + "}")) {
+                return null;
+            }
+            return change;
+        };
+        field.setTextFormatter(new TextFormatter<>(filter));
     }
 }

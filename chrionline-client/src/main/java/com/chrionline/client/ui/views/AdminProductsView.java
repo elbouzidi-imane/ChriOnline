@@ -1,5 +1,6 @@
 package com.chrionline.client.ui.views;
 
+import com.chrionline.client.model.CategoryDTO;
 import com.chrionline.client.model.GuideDTO;
 import com.chrionline.client.model.ProductDTO;
 import com.chrionline.client.model.ProductSizeDTO;
@@ -20,6 +21,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -32,6 +34,7 @@ public class AdminProductsView extends VBox {
     private final AdminService adminService = new AdminService();
     private final ProductService productService = new ProductService();
     private final TableView<ProductDTO> productsTable = new TableView<>();
+    private List<CategoryDTO> categories = List.of();
 
     public AdminProductsView() {
         if (!AdminViewSupport.ensureAdmin()) {
@@ -40,24 +43,30 @@ public class AdminProductsView extends VBox {
 
         VBox content = new VBox(18);
 
-        HBox headerActions = new HBox(10);
+        FlowPane headerActions = new FlowPane();
+        headerActions.setHgap(10);
+        headerActions.setVgap(10);
         Button refresh = ViewFactory.createSecondaryButton("Actualiser");
         refresh.setOnAction(event -> loadProducts());
         Button add = ViewFactory.createPrimaryButton("Ajouter un produit");
         add.setOnAction(event -> addProduct());
-        Button edit = ViewFactory.createSecondaryButton("Modifier");
+        Button categoriesInfo = ViewFactory.createSecondaryButton("Voir categories");
+        categoriesInfo.setOnAction(event -> showCategoryInfo());
+        Button addCategory = ViewFactory.createPrimaryButton("Ajouter categorie");
+        addCategory.setOnAction(event -> addCategory());
+        Button edit = ViewFactory.createSecondaryButton("Modifier produit");
         edit.setOnAction(event -> editProduct());
-        Button stock = ViewFactory.createSecondaryButton("Stock par taille");
+        Button stock = ViewFactory.createSecondaryButton("Gerer stock par taille");
         stock.setOnAction(event -> updateStock());
-        Button sizes = ViewFactory.createSecondaryButton("Tailles");
+        Button sizes = ViewFactory.createSecondaryButton("Gerer tailles");
         sizes.setOnAction(event -> manageSizes());
-        Button guides = ViewFactory.createSecondaryButton("Guides");
+        Button guides = ViewFactory.createSecondaryButton("Gerer guides");
         guides.setOnAction(event -> manageGuides());
-        Button delete = ViewFactory.createSecondaryButton("Supprimer");
+        Button delete = ViewFactory.createSecondaryButton("Supprimer produit");
         delete.setOnAction(event -> deleteProduct());
-        headerActions.getChildren().addAll(refresh, add, edit, stock, sizes, guides, delete);
+        headerActions.getChildren().addAll(refresh, add, addCategory, categoriesInfo, edit, stock, sizes, guides, delete);
 
-        Label hint = new Label("Cette page gere uniquement les actions exposees par le serveur admin: fiches produit et stock par taille.");
+        Label hint = new Label("Cette page gere les produits, le stock par taille et les guides. Les categories sont choisies par nom pour eviter la saisie manuelle d'un id.");
         hint.setWrapText(true);
         hint.setStyle("-fx-font-size: 13px; -fx-text-fill: #5b5f63;");
 
@@ -68,9 +77,7 @@ public class AdminProductsView extends VBox {
         nameCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(data.getValue().getNom()));
 
         TableColumn<ProductDTO, String> categoryCol = new TableColumn<>("Categorie");
-        categoryCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(
-                data.getValue().getCategorie() == null ? "-" : data.getValue().getCategorie().getNom()
-        ));
+        categoryCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(resolveCategoryName(data.getValue())));
 
         TableColumn<ProductDTO, String> priceCol = new TableColumn<>("Prix");
         priceCol.setCellValueFactory(data -> new ReadOnlyStringWrapper(PriceUtils.formatMad(data.getValue().getPrixAffiche())));
@@ -101,6 +108,14 @@ public class AdminProductsView extends VBox {
 
     private void loadProducts() {
         try {
+            try {
+                categories = adminService.getAdminCategories();
+            } catch (Exception ignored) {
+                categories = productService.getCategories();
+            }
+            if (categories == null || categories.isEmpty()) {
+                categories = productService.getCategories();
+            }
             List<ProductDTO> products = productService.getAll();
             productsTable.setItems(FXCollections.observableArrayList(products));
         } catch (Exception e) {
@@ -120,6 +135,39 @@ public class AdminProductsView extends VBox {
             UIUtils.showSuccess("Produit ajoute avec succes.");
         } catch (Exception e) {
             UIUtils.showError(e.getMessage());
+        }
+    }
+
+    private void addCategory() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Ajouter une categorie");
+        DialogPane pane = dialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Nom de la categorie");
+        TextField descriptionField = new TextField();
+        descriptionField.setPromptText("Description");
+
+        VBox content = new VBox(12,
+                new Label("Cette categorie apparaitra ensuite dans l'admin et dans le filtre client."),
+                nameField,
+                descriptionField);
+        pane.setContent(content);
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return;
+        }
+
+        try {
+            adminService.addCategory(nameField.getText().trim(), descriptionField.getText().trim());
+            loadProducts();
+            UIUtils.showSuccess("Categorie ajoutee avec succes.");
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage()
+                    + "\n\nLe serveur doit aussi router ADMIN_ADD_CATEGORY et ADMIN_GET_CATEGORIES dans ClientHandler.");
         }
     }
 
@@ -367,15 +415,51 @@ public class AdminProductsView extends VBox {
     }
 
     private ProductFormData showProductForm(ProductDTO product) {
+        if (categories == null || categories.isEmpty()) {
+            try {
+                try {
+                    categories = adminService.getAdminCategories();
+                } catch (Exception ignored) {
+                    categories = productService.getCategories();
+                }
+                if (categories == null || categories.isEmpty()) {
+                    categories = productService.getCategories();
+                }
+            } catch (Exception e) {
+                UIUtils.showError("Impossible de charger les categories : " + e.getMessage());
+                return null;
+            }
+        }
+        if (categories == null || categories.isEmpty()) {
+            UIUtils.showError("Aucune categorie disponible. Ajoutez d'abord une categorie.");
+            return null;
+        }
+
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle(product == null ? "Ajouter un produit" : "Modifier un produit");
         DialogPane pane = dialog.getDialogPane();
         pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
         pane.setStyle("-fx-background-color: #fffaf5;");
 
-        ComboBox<Integer> categorieField = new ComboBox<>();
-        categorieField.setItems(FXCollections.observableArrayList(1, 2, 3, 4));
-        categorieField.getSelectionModel().select(product == null ? Integer.valueOf(1) : product.getCategorieId());
+        ComboBox<CategoryDTO> categorieField = new ComboBox<>(FXCollections.observableArrayList(categories));
+        categorieField.setCellFactory(ignored -> new ListCell<>() {
+            @Override
+            protected void updateItem(CategoryDTO item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : item.getNom() + " (#" + item.getId() + ")");
+            }
+        });
+        categorieField.setButtonCell(categorieField.getCellFactory().call(null));
+        if (product == null) {
+            if (!categories.isEmpty()) {
+                categorieField.getSelectionModel().selectFirst();
+            }
+        } else {
+            categories.stream()
+                    .filter(category -> category.getId() == product.getCategorieId())
+                    .findFirst()
+                    .ifPresent(category -> categorieField.getSelectionModel().select(category));
+        }
 
         TextField nomField = new TextField(product == null ? "" : product.getNom());
         TextField descriptionField = new TextField(product == null ? "" : nullToEmpty(product.getDescription()));
@@ -388,7 +472,7 @@ public class AdminProductsView extends VBox {
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(12);
-        grid.addRow(0, new Label("Categorie ID"), categorieField);
+        grid.addRow(0, new Label("Categorie"), categorieField);
         grid.addRow(1, new Label("Nom"), nomField);
         grid.addRow(2, new Label("Description"), descriptionField);
         grid.addRow(3, new Label("Matiere"), matiereField);
@@ -404,13 +488,36 @@ public class AdminProductsView extends VBox {
         }
 
         ProductFormData data = new ProductFormData();
-        data.categorieId = categorieField.getValue();
+        if (categorieField.getValue() == null) {
+            UIUtils.showError("Selectionnez une categorie.");
+            return null;
+        }
+        if (nomField.getText().isBlank() || prixOriginalField.getText().isBlank()) {
+            UIUtils.showError("Le nom et le prix original sont obligatoires.");
+            return null;
+        }
+        data.categorieId = categorieField.getValue().getId();
         data.nom = nomField.getText().trim();
         data.description = descriptionField.getText().trim();
         data.matiere = matiereField.getText().trim();
         data.couleur = couleurField.getText().trim();
-        data.prixOriginal = Double.parseDouble(prixOriginalField.getText().trim());
-        data.prixReduit = prixReduitField.getText().trim();
+        try {
+            data.prixOriginal = Double.parseDouble(normalizeDecimal(prixOriginalField.getText()));
+        } catch (NumberFormatException e) {
+            UIUtils.showError("Le prix original est invalide.");
+            return null;
+        }
+        if (!prixReduitField.getText().isBlank()) {
+            try {
+                Double.parseDouble(normalizeDecimal(prixReduitField.getText()));
+                data.prixReduit = normalizeDecimal(prixReduitField.getText());
+            } catch (NumberFormatException e) {
+                UIUtils.showError("Le prix reduit est invalide.");
+                return null;
+            }
+        } else {
+            data.prixReduit = "";
+        }
         data.imageUrl = imageUrlField.getText().trim();
         return data;
     }
@@ -421,6 +528,34 @@ public class AdminProductsView extends VBox {
 
     private String valueOrDash(String value) {
         return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private String normalizeDecimal(String value) {
+        return value == null ? "" : value.trim().replace(',', '.');
+    }
+
+    private String resolveCategoryName(ProductDTO product) {
+        if (product.getCategorie() != null && product.getCategorie().getNom() != null
+                && !product.getCategorie().getNom().isBlank()) {
+            return product.getCategorie().getNom();
+        }
+        return categories.stream()
+                .filter(category -> category.getId() == product.getCategorieId())
+                .map(CategoryDTO::getNom)
+                .findFirst()
+                .orElse("-");
+    }
+
+    private void showCategoryInfo() {
+        String categoryList = categories.isEmpty()
+                ? "Aucune categorie chargee."
+                : categories.stream()
+                .map(category -> "- " + category.getNom() + " (#" + category.getId() + ")")
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("Aucune categorie chargee.");
+
+        UIUtils.showInfo("Categories disponibles :\n" + categoryList
+                + "\n\nSi l'ajout echoue encore, il faut completer le routage serveur dans ClientHandler.");
     }
 
     private static final class ProductFormData {

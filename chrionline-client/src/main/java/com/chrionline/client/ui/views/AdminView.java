@@ -49,7 +49,9 @@ public class AdminView extends VBox {
         usersButton.setOnAction(event -> com.chrionline.client.ui.NavigationManager.navigateTo(new AdminUsersView()));
         Button ordersButton = ViewFactory.createSecondaryButton("Suivre les commandes");
         ordersButton.setOnAction(event -> com.chrionline.client.ui.NavigationManager.navigateTo(new AdminOrdersView()));
-        quickActions.getChildren().addAll(productsButton, usersButton, ordersButton);
+        Button promosButton = ViewFactory.createSecondaryButton("Codes promo");
+        promosButton.setOnAction(event -> com.chrionline.client.ui.NavigationManager.navigateTo(new AdminPromosView()));
+        quickActions.getChildren().addAll(productsButton, usersButton, ordersButton, promosButton);
 
         VBox capabilitiesCard = new VBox(10);
         capabilitiesCard.setPadding(new Insets(18));
@@ -62,8 +64,8 @@ public class AdminView extends VBox {
                 capabilitiesTitle,
                 createBullet("Produits: ajouter, modifier, supprimer, mettre a jour le stock par taille"),
                 createBullet("Utilisateurs: afficher, suspendre, reactiver"),
-                createBullet("Commandes: afficher la liste globale en lecture seule"),
-                createBullet("Paiement detaille et changement de statut commande: non exposes par le serveur actuel")
+                createBullet("Commandes: afficher la liste globale, gerer annulations et remboursements"),
+                createBullet("Codes promo: creer, activer, desactiver et consulter les statistiques d'usage")
         );
 
         welcomeCard.getChildren().addAll(welcomeTitle, welcomeText, quickActions);

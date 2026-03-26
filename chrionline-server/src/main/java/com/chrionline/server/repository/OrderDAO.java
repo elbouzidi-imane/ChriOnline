@@ -31,7 +31,7 @@ public class OrderDAO {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 order.setId(rs.getInt("id"));
-                order.setDateCommande(rs.getDate("date_commande"));
+                order.setDateCommande(rs.getTimestamp("date_commande"));
             }
             return order;
         } catch (Exception e) {
@@ -134,6 +134,20 @@ public class OrderDAO {
         }
     }
 
+    public boolean updateCancellationInfo(int id, String statut, String motifAnnulation) {
+        String sql = "UPDATE commande SET statut = ?, motif_annulation = ? WHERE id = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, statut);
+            ps.setString(2, motifAnnulation == null || motifAnnulation.isBlank() ? null : motifAnnulation.trim());
+            ps.setInt(3, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("OrderDAO.updateCancellationInfo : " + e.getMessage());
+            return false;
+        }
+    }
+
     // ── Lignes d'une commande ─────────────────────────
     public List<OrderLine> findLines(int commandeId) {
         String sql = "SELECT * FROM ligne_commande WHERE commande_id = ?";
@@ -163,10 +177,11 @@ public class OrderDAO {
         o.setId(rs.getInt("id"));
         o.setReference(rs.getString("reference"));
         o.setUtilisateurId(rs.getInt("utilisateur_id"));
-        o.setDateCommande(rs.getDate("date_commande"));
+        o.setDateCommande(rs.getTimestamp("date_commande"));
         o.setStatut(rs.getString("statut"));
         o.setMontantTotal(rs.getDouble("montant_total"));
         o.setAdresseLivraison(rs.getString("adresse_livraison"));
+        o.setMotifAnnulation(rs.getString("motif_annulation"));
         return o;
     }
 }

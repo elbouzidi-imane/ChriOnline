@@ -4,6 +4,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -52,6 +53,9 @@ public final class ViewFactory {
         Button button = new Button(text);
         button.setStyle("-fx-background-color: #d97706; -fx-text-fill: white; -fx-font-weight: bold; "
                 + "-fx-background-radius: 14; -fx-padding: 11 18 11 18;");
+        button.setWrapText(false);
+        button.setTextOverrun(OverrunStyle.CLIP);
+        button.setMinWidth(110);
         return button;
     }
 
@@ -59,6 +63,9 @@ public final class ViewFactory {
         Button button = new Button(text);
         button.setStyle("-fx-background-color: white; -fx-text-fill: #162521; -fx-font-weight: bold; "
                 + "-fx-background-radius: 14; -fx-padding: 11 18 11 18;");
+        button.setWrapText(false);
+        button.setTextOverrun(OverrunStyle.CLIP);
+        button.setMinWidth(110);
         return button;
     }
 
