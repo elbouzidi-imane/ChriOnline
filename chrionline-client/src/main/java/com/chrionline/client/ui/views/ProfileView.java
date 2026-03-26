@@ -49,20 +49,35 @@ public class ProfileView extends VBox {
         Button updateButton = ViewFactory.createPrimaryButton("Mettre a jour");
         updateButton.setOnAction(event -> {
             try {
+                String nom = nomField.getText().trim();
+                String prenom = prenomField.getText().trim();
+                String telephone = telephoneField.getText().trim();
+                String adresse = adresseField.getText().trim();
+                String dateNaissanceValue = birthField.getText().trim();
+
                 UIUtils.showSuccess(authService.updateProfile(
                         AppSession.getCurrentUser().getId(),
-                        nomField.getText().trim(),
-                        prenomField.getText().trim(),
-                        telephoneField.getText().trim(),
-                        adresseField.getText().trim(),
-                        birthField.getText().trim()
+                        nom,
+                        prenom,
+                        telephone,
+                        adresse,
+                        dateNaissanceValue
                 ));
                 authService.updateNotificationPreference(
                         AppSession.getCurrentUser().getId(),
                         notificationsBox.isSelected()
                 );
+                AppSession.getCurrentUser().setNom(nom);
+                AppSession.getCurrentUser().setPrenom(prenom);
+                AppSession.getCurrentUser().setTelephone(telephone);
+                AppSession.getCurrentUser().setAdresse(adresse);
+                if (dateNaissanceValue.isBlank()) {
+                    AppSession.getCurrentUser().setDateNaissance(null);
+                } else {
+                    AppSession.getCurrentUser().setDateNaissance(java.sql.Date.valueOf(dateNaissanceValue));
+                }
                 AppSession.getCurrentUser().setNotificationsActivees(notificationsBox.isSelected());
-                UIUtils.showInfo("Reconnectez-vous pour rafraichir les donnees locales du profil.");
+                UIUtils.showInfo("Le profil local a ete mis a jour.");
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
             }
