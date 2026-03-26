@@ -110,4 +110,47 @@ public class EmailService {
                 """.formatted(code);
         return sendEmail(to, subject, body);
     }
+    // ── EMAIL CONFIRMATION COMMANDE 🔥 ───────────────
+    public boolean sendOrderConfirmationEmail(String to, String nom,
+                                              String reference, double total) {
+
+        String subject = "Confirmation de votre commande";
+
+        String body = """
+                Bonjour %s,
+
+                Votre commande a été confirmée avec succès 🎉
+
+                Référence : %s
+                Montant : %.2f €
+
+                Nous vous informerons des prochaines étapes.
+
+                Merci pour votre confiance ❤️
+                ChriOnline
+                """.formatted(nom, reference, total);
+
+        return sendEmail(to, subject, body);
+    }
+    // ── EMAIL CHANGEMENT STATUT 🔥🔥 ─────────────────
+    public boolean sendOrderStatusEmail(String to, String nom,
+                                        String reference, String statut) {
+
+        String subject = "Mise à jour de votre commande";
+
+        String body = """
+                Bonjour %s,
+
+                Le statut de votre commande a été mis à jour.
+
+                Référence : %s
+                Nouveau statut : %s
+
+                Merci pour votre confiance ❤️
+                ChriOnline
+                """.formatted(nom, reference, statut);
+
+        return sendEmail(to, subject, body);
+    }
+
 }

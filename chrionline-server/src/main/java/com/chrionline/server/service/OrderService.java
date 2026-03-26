@@ -13,7 +13,7 @@ public class OrderService {
     private final ProductDAO   productDAO   = new ProductDAO();
     private final PaymentDAO   paymentDAO   = new PaymentDAO();
     private final LivraisonDAO livraisonDAO = new LivraisonDAO();
-
+    private final UserDAO      userDAO      = new UserDAO();
     // ── Valider une commande ──────────────────────────
     public Order validerCommande(int userId, String adresse,
                                  String modePaiement, String modeLivraison) {
