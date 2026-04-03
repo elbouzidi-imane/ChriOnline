@@ -26,6 +26,10 @@ public class PaymentService {
         return paymentDAO.findByCommande(commandeId);
     }
 
+    public java.util.List<Payment> getAll() {
+        return paymentDAO.findAll();
+    }
+
     public boolean rembourser(int commandeId) {
         Payment payment = paymentDAO.findByCommande(commandeId);
         if (payment == null) {

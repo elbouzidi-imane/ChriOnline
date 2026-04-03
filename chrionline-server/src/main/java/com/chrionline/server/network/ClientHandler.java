@@ -74,7 +74,7 @@ public class ClientHandler implements Runnable {
                  Protocol.GET_NOTIFICATIONS,
                  Protocol.MARK_NOTIFICATION_READ,
                  Protocol.DEACTIVATE_ACCOUNT,
-                 Protocol.DELETE_ACCOUNT -> authHandler.handle(req);
+                 Protocol.DELETE_ACCOUNT -> authHandler.handle(req, socket.getInetAddress().getHostAddress());
 
             case Protocol.GET_PRODUCTS,
                  Protocol.GET_PRODUCT,
@@ -119,6 +119,7 @@ public class ClientHandler implements Runnable {
                  Protocol.ADMIN_UPDATE_CANCELLATION_CONFIG,
                  Protocol.ADMIN_GET_CANCELLATION_CONFIG,
                  Protocol.ADMIN_GET_PAYMENT,
+                 Protocol.ADMIN_GET_PAYMENTS,
                  Protocol.ADMIN_REMBOURSE,
                  Protocol.ADMIN_ADD_PROMO,
                  Protocol.ADMIN_GET_PROMOS,

@@ -74,6 +74,7 @@ public class AdminHandler {
             case Protocol.ADMIN_UPDATE_CANCELLATION_CONFIG -> handleUpdateCancellationConfig(request);
 
             case Protocol.ADMIN_GET_PAYMENT -> handleGetPayment(request);
+            case Protocol.ADMIN_GET_PAYMENTS -> handleGetPayments();
             case Protocol.ADMIN_REMBOURSE -> handleRembourse(request);
             case Protocol.ADMIN_ADD_PROMO -> handleAddPromo(request);
             case Protocol.ADMIN_GET_PROMOS -> handleGetPromos();
@@ -557,6 +558,14 @@ public class AdminHandler {
                 return Message.error("Code promo introuvable");
             }
             return Message.ok(Protocol.ADMIN_TOGGLE_PROMO, "Statut du code promo mis a jour");
+        } catch (Exception e) {
+            return Message.error("Erreur : " + e.getMessage());
+        }
+    }
+
+    private Message handleGetPayments() {
+        try {
+            return Message.ok(Protocol.ADMIN_GET_PAYMENTS, gson.toJson(paymentService.getAll()));
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
         }

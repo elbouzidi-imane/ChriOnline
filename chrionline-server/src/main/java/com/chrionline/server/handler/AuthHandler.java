@@ -3,19 +3,26 @@ package com.chrionline.server.handler;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.User;
+import com.chrionline.server.security.PasswordPolicy;
+import com.chrionline.server.service.LoginAttemptService;
 import com.chrionline.server.service.NotificationService;
 import com.chrionline.server.service.UserService;
 import com.google.gson.Gson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AuthHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger("SECURITY_AUTH");
+    private static final String GENERIC_LOGIN_ERROR = "Authentification impossible. Verifiez vos identifiants ou reessayez plus tard.";
 
     private final UserService userService = new UserService();
     private final NotificationService notificationService = new NotificationService();
+    private final LoginAttemptService loginAttemptService = LoginAttemptService.getInstance();
     private final Gson gson = new Gson();
 
-    public Message handle(Message request) {
+    public Message handle(Message request, String clientIp) {
         return switch (request.getType()) {
-            case Protocol.LOGIN -> handleLogin(request);
+            case Protocol.LOGIN -> handleLogin(request, clientIp);
             case Protocol.REGISTER -> handleRegister(request);
             case Protocol.LOGOUT -> handleLogout(request);
             case Protocol.VERIFY_EMAIL -> handleVerifyEmail(request);
@@ -34,7 +41,7 @@ public class AuthHandler {
         };
     }
 
-    private Message handleLogin(Message req) {
+    private Message handleLogin(Message req, String clientIp) {
         String payload = req.getPayload();
         if (payload == null || !payload.contains(":")) {
             return Message.error("Format invalide. Attendu : email:motdepasse");
@@ -45,10 +52,27 @@ public class AuthHandler {
         if (email.isEmpty() || mdp.isEmpty()) {
             return Message.error("Email et mot de passe obligatoires");
         }
+
+        LoginAttemptService.RateLimitDecision decision = loginAttemptService.check(email, clientIp);
+        if (decision.blocked()) {
+            LOGGER.warn(
+                    "Tentative de login refusee pour rate limiting scope={}, key={}, ip={}, retryAfter={}s",
+                    decision.scope(),
+                    decision.key(),
+                    clientIp,
+                    decision.retryAfterSeconds()
+            );
+            return Message.error("Trop de tentatives de connexion. Reessayez dans quelques minutes.");
+        }
+
         User user = userService.login(email, mdp);
         if (user == null) {
-            return Message.error("Identifiants incorrects ou compte suspendu");
+            loginAttemptService.recordFailure(email, clientIp);
+            LOGGER.info("Echec de connexion pour email={}, ip={}", email, clientIp);
+            return Message.error(GENERIC_LOGIN_ERROR);
         }
+        loginAttemptService.recordSuccess(email, clientIp);
+        LOGGER.info("Connexion reussie pour email={}, ip={}", email, clientIp);
         return Message.ok(Protocol.LOGIN, gson.toJson(user));
     }
 
@@ -69,7 +93,11 @@ public class AuthHandler {
 
         if (nom.isEmpty() || prenom.isEmpty()) return Message.error("Nom et prenom obligatoires");
         if (email.isEmpty() || !email.contains("@")) return Message.error("Email invalide");
-        if (mdp.length() < 4) return Message.error("Mot de passe trop court (minimum 4 caracteres)");
+        String passwordError = PasswordPolicy.validate(
+                mdp,
+                PasswordPolicy.buildForbiddenTerms(email, nom, prenom, dateNaissance)
+        );
+        if (passwordError != null) return Message.error(passwordError);
 
         String result = userService.registerWithOtp(
                 nom, prenom, email, mdp, telephone, adresse, dateNaissance);
@@ -128,7 +156,19 @@ public class AuthHandler {
         if (parts.length < 2) return Message.error("Format invalide");
         String email = parts[0].trim();
         String nouveauMdp = parts[1].trim();
-        if (nouveauMdp.length() < 4) return Message.error("Mot de passe trop court");
+        User user = userService.getUserByEmail(email);
+        String passwordError = PasswordPolicy.validate(
+                nouveauMdp,
+                PasswordPolicy.buildForbiddenTerms(
+                        email,
+                        user == null ? null : user.getNom(),
+                        user == null ? null : user.getPrenom(),
+                        user != null && user.getDateNaissance() != null
+                                ? new java.text.SimpleDateFormat("yyyy-MM-dd").format(user.getDateNaissance())
+                                : null
+                )
+        );
+        if (passwordError != null) return Message.error(passwordError);
         boolean ok = userService.resetPassword(email, nouveauMdp);
         if (!ok) return Message.error("Erreur reinitialisation");
         return Message.ok(Protocol.RESET_PASSWORD, "Mot de passe reinitialise avec succes");

@@ -163,13 +163,9 @@ public class AdminOrdersView extends VBox {
         try {
             List<OrderDTO> orders = adminService.getOrders();
             paymentCache.clear();
-            for (OrderDTO order : orders) {
-                try {
-                    PaymentDTO payment = adminService.getPayment(order.getId());
-                    if (payment != null) {
-                        paymentCache.put(order.getId(), payment);
-                    }
-                } catch (Exception ignored) {
+            for (PaymentDTO payment : adminService.getPayments()) {
+                if (payment != null) {
+                    paymentCache.put(payment.getCommandeId(), payment);
                 }
             }
             ordersTable.setItems(FXCollections.observableArrayList(orders));

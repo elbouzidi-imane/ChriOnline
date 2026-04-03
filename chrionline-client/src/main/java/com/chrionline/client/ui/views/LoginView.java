@@ -9,6 +9,7 @@ import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
@@ -29,6 +30,8 @@ import java.util.List;
 import java.util.Optional;
 
 public class LoginView extends HBox {
+    private static final int MAX_ATTEMPTS = 5;
+
     private final AuthService authService = new AuthService();
     private final NotificationService notificationService = new NotificationService();
 
@@ -99,6 +102,9 @@ public class LoginView extends HBox {
         title.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #162521;");
         Label subtitle = new Label("Accedez a votre espace en quelques secondes.");
         subtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");
+        Label loginAttemptLabel = new Label();
+        loginAttemptLabel.setWrapText(true);
+        loginAttemptLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9b2226;");
 
         TextField emailField = new TextField();
         emailField.setPromptText("Email");
@@ -106,13 +112,29 @@ public class LoginView extends HBox {
         emailField.setStyle(ViewFactory.inputStyle());
 
         PasswordToggleControl passwordField = new PasswordToggleControl("Mot de passe");
+        final int[] loginAttempts = {0};
+        final String[] lastAttemptEmail = {""};
 
         Button loginButton = ViewFactory.createPrimaryButton("Se connecter");
         loginButton.setDefaultButton(true);
         loginButton.setMaxWidth(Double.MAX_VALUE);
         loginButton.setOnAction(event -> {
+            String currentEmail = emailField.getText().trim().toLowerCase();
+            if (!currentEmail.equals(lastAttemptEmail[0])) {
+                loginAttempts[0] = 0;
+                loginAttemptLabel.setText("");
+                loginButton.setDisable(false);
+                lastAttemptEmail[0] = currentEmail;
+            }
+            if (loginAttempts[0] >= MAX_ATTEMPTS) {
+                UIUtils.showError("Vous avez atteint la limite de 5 essais d'authentification.");
+                return;
+            }
             try {
                 var user = authService.login(emailField.getText().trim(), passwordField.getValue());
+                loginAttempts[0] = 0;
+                lastAttemptEmail[0] = currentEmail;
+                loginAttemptLabel.setText("");
                 AppSession.setCurrentUser(user);
                 showPendingNotifications();
                 if (user.isAdmin()) {
@@ -121,7 +143,14 @@ public class LoginView extends HBox {
                     NavigationManager.navigateTo(new ProductListView());
                 }
             } catch (Exception e) {
-                UIUtils.showError(e.getMessage());
+                loginAttempts[0]++;
+                loginAttemptLabel.setText(formatAttemptMessage("authentification", loginAttempts[0]));
+                if (loginAttempts[0] >= MAX_ATTEMPTS) {
+                    loginButton.setDisable(true);
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("authentification", loginAttempts[0]) + "). Limite de 5 essais atteinte.");
+                } else {
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("authentification", loginAttempts[0]) + ")");
+                }
             }
         });
 
@@ -131,7 +160,7 @@ public class LoginView extends HBox {
         Hyperlink forgotLink = new Hyperlink("Mot de passe oublie ?");
         forgotLink.setOnAction(event -> showForgotPasswordFlow());
 
-        formCard.getChildren().addAll(title, subtitle, emailField, passwordField, loginButton, registerLink, catalogLink, forgotLink, homeLink);
+        formCard.getChildren().addAll(title, subtitle, emailField, passwordField, loginAttemptLabel, loginButton, registerLink, catalogLink, forgotLink, homeLink);
         form.getChildren().add(formCard);
         getChildren().addAll(marketing, form);
     }
@@ -199,22 +228,105 @@ public class LoginView extends HBox {
         PasswordField newPasswordField = new PasswordField();
         newPasswordField.setPromptText("Nouveau mot de passe");
         newPasswordField.setStyle(ViewFactory.inputStyle());
+        Label otpAttemptLabel = new Label();
+        otpAttemptLabel.setWrapText(true);
+        otpAttemptLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9b2226;");
         otpPane.setContent(new VBox(12,
                 new Label("Entrez le code recu puis choisissez un nouveau mot de passe."),
                 otpField,
-                newPasswordField));
+                newPasswordField,
+                otpAttemptLabel));
+
+        Button okButton = (Button) otpPane.lookupButton(ButtonType.OK);
+        final int[] otpAttempts = {0};
+        okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            String passwordError = validatePasswordPolicy(newPasswordField.getText(), emailField.getText().trim());
+            if (passwordError != null) {
+                UIUtils.showError(passwordError);
+                event.consume();
+                return;
+            }
+            if (otpAttempts[0] >= MAX_ATTEMPTS) {
+                UIUtils.showError("Vous avez atteint la limite de 5 essais pour la verification du code.");
+                event.consume();
+                return;
+            }
+            try {
+                authService.verifyResetOtp(emailField.getText().trim(), otpField.getText().trim());
+                UIUtils.showSuccess(authService.resetPassword(emailField.getText().trim(), newPasswordField.getText()));
+                otpAttempts[0] = 0;
+                otpAttemptLabel.setText("");
+            } catch (Exception e) {
+                otpAttempts[0]++;
+                otpAttemptLabel.setText(formatAttemptMessage("verification du code", otpAttempts[0]));
+                if (otpAttempts[0] >= MAX_ATTEMPTS) {
+                    okButton.setDisable(true);
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("verification du code", otpAttempts[0]) + "). Limite de 5 essais atteinte.");
+                } else {
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("verification du code", otpAttempts[0]) + ")");
+                }
+                event.consume();
+            }
+        });
 
         Optional<ButtonType> secondStep = otpDialog.showAndWait();
-        if (secondStep.isEmpty() || secondStep.get() != ButtonType.OK) {
+        if (secondStep.isEmpty() || secondStep.get().getButtonData() == ButtonBar.ButtonData.CANCEL_CLOSE) {
             return;
         }
+    }
 
-        try {
-            authService.verifyResetOtp(emailField.getText().trim(), otpField.getText().trim());
-            UIUtils.showSuccess(authService.resetPassword(emailField.getText().trim(), newPasswordField.getText()));
-        } catch (Exception e) {
-            UIUtils.showError(e.getMessage());
+    private String formatAttemptMessage(String context, int attempts) {
+        return "Nombre d'essais " + context + " : " + attempts;
+    }
+
+    private String validatePasswordPolicy(String password, String... forbiddenTerms) {
+        if (password == null || password.isBlank()) {
+            return "Mot de passe obligatoire.\n\n" + passwordGuidance();
         }
+        if (password.length() < 8) {
+            return "Mot de passe trop faible: il doit contenir au moins 8 caracteres.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isUpperCase)) {
+            return "Mot de passe trop faible: ajoutez au moins une lettre majuscule.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isLowerCase)) {
+            return "Mot de passe trop faible: ajoutez au moins une lettre minuscule.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isDigit)) {
+            return "Mot de passe trop faible: ajoutez au moins un chiffre.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(ch -> !Character.isLetterOrDigit(ch))) {
+            return "Mot de passe trop faible: ajoutez au moins un caractere special.\n\n" + passwordGuidance();
+        }
+        if (containsForbiddenTerm(password, forbiddenTerms)) {
+            return "Mot de passe refuse: il ne doit pas contenir votre email, votre nom, votre prenom ou votre date de naissance.\n\n" + passwordGuidance();
+        }
+        return null;
+    }
+
+    private String passwordGuidance() {
+        return "Pour corriger le mot de passe, utilisez au minimum 8 caracteres avec 1 majuscule, 1 minuscule, 1 chiffre et 1 caractere special, sans email, nom, prenom ni date de naissance.";
+    }
+
+    private boolean containsForbiddenTerm(String password, String... forbiddenTerms) {
+        String normalizedPassword = password.toLowerCase();
+        for (String term : forbiddenTerms) {
+            if (term == null || term.isBlank()) {
+                continue;
+            }
+            String normalizedTerm = term.trim().toLowerCase();
+            if (normalizedPassword.contains(normalizedTerm)) {
+                return true;
+            }
+            int atIndex = normalizedTerm.indexOf('@');
+            if (atIndex > 0) {
+                String localPart = normalizedTerm.substring(0, atIndex);
+                if (localPart.length() >= 3 && normalizedPassword.contains(localPart)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static final class PasswordToggleControl extends StackPane {

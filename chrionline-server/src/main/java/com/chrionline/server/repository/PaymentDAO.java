@@ -59,6 +59,29 @@ public class PaymentDAO {
         return null;
     }
 
+    public java.util.List<Payment> findAll() {
+        String sql = "SELECT * FROM paiement ORDER BY date_paiement DESC";
+        java.util.List<Payment> payments = new java.util.ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                Payment p = new Payment();
+                p.setId(rs.getInt("id"));
+                p.setCommandeId(rs.getInt("commande_id"));
+                p.setMontant(rs.getDouble("montant"));
+                p.setModePaiement(rs.getString("mode_paiement"));
+                p.setStatut(rs.getString("statut"));
+                p.setDatePaiement(rs.getTimestamp("date_paiement"));
+                p.setReference(rs.getString("reference"));
+                payments.add(p);
+            }
+        } catch (Exception e) {
+            System.err.println("PaymentDAO.findAll : " + e.getMessage());
+        }
+        return payments;
+    }
+
     public boolean updateStatut(int commandeId, String statut) {
         String sql = "UPDATE paiement SET statut = ? WHERE commande_id = ?";
         try (Connection conn = getConnection();

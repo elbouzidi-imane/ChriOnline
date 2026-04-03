@@ -116,6 +116,12 @@ public class AdminService {
         return JsonUtils.GSON.fromJson(response.getPayload(), PaymentDTO.class);
     }
 
+    public List<PaymentDTO> getPayments() throws Exception {
+        Message response = sendAdmin(Protocol.ADMIN_GET_PAYMENTS, "");
+        Type listType = new TypeToken<List<PaymentDTO>>() { }.getType();
+        return JsonUtils.GSON.fromJson(response.getPayload(), listType);
+    }
+
     public void remboursement(int commandeId) throws Exception {
         sendAdmin(Protocol.ADMIN_REMBOURSE, String.valueOf(commandeId));
     }

@@ -60,6 +60,7 @@ public class Protocol {
     public static final String ADMIN_UPDATE_CANCELLATION_CONFIG = "ADMIN_UPDATE_CANCELLATION_CONFIG";
     public static final String ADMIN_GET_CANCELLATION_CONFIG = "ADMIN_GET_CANCELLATION_CONFIG";
     public static final String ADMIN_GET_PAYMENT = "ADMIN_GET_PAYMENT";
+    public static final String ADMIN_GET_PAYMENTS = "ADMIN_GET_PAYMENTS";
     public static final String ADMIN_REMBOURSE = "ADMIN_REMBOURSE";
     public static final String ADMIN_ADD_PROMO = "ADMIN_ADD_PROMO";
     public static final String ADMIN_GET_PROMOS = "ADMIN_GET_PROMOS";

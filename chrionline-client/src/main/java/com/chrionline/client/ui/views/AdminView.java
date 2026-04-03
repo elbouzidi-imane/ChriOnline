@@ -106,8 +106,7 @@ public class AdminView extends VBox {
                 content
         ));
 
-        loadCounts();
-        loadCharts();
+        loadDashboardData();
     }
 
     private Label createBullet(String text) {
@@ -117,21 +116,15 @@ public class AdminView extends VBox {
         return label;
     }
 
-    private void loadCounts() {
-        try {
-            productsCount.setText(String.valueOf(productService.getAll().size()));
-            usersCount.setText(String.valueOf(adminService.getUsers().size()));
-            ordersCount.setText(String.valueOf(adminService.getOrders().size()));
-        } catch (Exception e) {
-            UIUtils.showError(e.getMessage());
-        }
-    }
-
-    private void loadCharts() {
+    private void loadDashboardData() {
         try {
             List<ProductDTO> products = productService.getAll();
             List<UserDTO> users = adminService.getUsers();
             List<OrderDTO> orders = adminService.getOrders();
+
+            productsCount.setText(String.valueOf(products.size()));
+            usersCount.setText(String.valueOf(users.size()));
+            ordersCount.setText(String.valueOf(orders.size()));
 
             VBox titleBlock = new VBox(6);
             Label title = new Label("Visualisations");
@@ -152,6 +145,7 @@ public class AdminView extends VBox {
             VBox bottomChart = createOrdersTimelineChart(orders);
             chartsSection.getChildren().setAll(titleBlock, topCharts, bottomChart);
         } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
             chartsSection.getChildren().setAll(createPlaceholderCard("Impossible de charger les graphiques."));
         }
     }

@@ -3,16 +3,19 @@ package com.chrionline.client.ui.views;
 import com.chrionline.client.service.AuthService;
 import com.chrionline.client.ui.NavigationManager;
 import com.chrionline.client.util.UIUtils;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -34,6 +37,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class RegisterView extends ScrollPane {
+    private static final int MAX_ATTEMPTS = 5;
+
     private static final Map<String, List<String>> REGION_CITIES = createRegionCities();
 
     private final AuthService authService = new AuthService();
@@ -92,13 +97,15 @@ public class RegisterView extends ScrollPane {
         Label subtitle = new Label("Renseignez vos informations puis confirmez votre email pour activer le compte.");
         subtitle.setStyle("-fx-font-size: 13px; -fx-text-fill: #5f6368;");
         subtitle.setWrapText(true);
+        Label requiredHint = new Label("* Champ obligatoire");
+        requiredHint.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #9b5d20;");
 
-        TextField nomField = createField("Nom");
-        TextField prenomField = createField("Prenom");
-        TextField emailField = createField("Email");
-        TextField telField = createField("Telephone");
-        PasswordToggleControl passwordControl = new PasswordToggleControl("Mot de passe");
-        PasswordToggleControl confirmControl = new PasswordToggleControl("Confirmer le mot de passe");
+        TextField nomField = createField("Nom *");
+        TextField prenomField = createField("Prenom *");
+        TextField emailField = createField("Email *");
+        TextField telField = createField("Telephone (optionnel)");
+        PasswordToggleControl passwordControl = new PasswordToggleControl("Mot de passe *");
+        PasswordToggleControl confirmControl = new PasswordToggleControl("Confirmer le mot de passe *");
 
         ComboBox<Integer> dayBox = createNumberBox("Jour", 1, 31);
         ComboBox<String> monthBox = new ComboBox<>(FXCollections.observableArrayList(
@@ -121,19 +128,30 @@ public class RegisterView extends ScrollPane {
         HBox birthRow = new HBox(10, dayBox, monthBox, yearBox);
         birthRow.setMaxWidth(Double.MAX_VALUE);
 
-        ComboBox<String> regionBox = new ComboBox<>(FXCollections.observableArrayList(REGION_CITIES.keySet()));
-        regionBox.setPromptText("Region");
-        styleCombo(regionBox);
+        TextField regionSearchField = createField("Rechercher une region *");
+        ListView<String> regionSuggestions = createSuggestionList();
+        TextField citySearchField = createField("Rechercher une ville *");
+        citySearchField.setDisable(true);
+        ListView<String> citySuggestions = createSuggestionList();
+        VBox regionPicker = new VBox(6, regionSearchField, regionSuggestions);
+        installAutoComplete(regionSearchField, regionSuggestions, REGION_CITIES.keySet().stream().toList(), selectedRegion -> {
+            regionSearchField.setText(selectedRegion);
+            citySearchField.clear();
+            citySearchField.setDisable(false);
+            citySuggestions.getItems().clear();
+        });
+        VBox cityPicker = new VBox(6, citySearchField, citySuggestions);
+        installAutoComplete(citySearchField, citySuggestions, List.of(), selectedCity -> citySearchField.setText(selectedCity));
 
-        ComboBox<String> cityBox = new ComboBox<>();
-        cityBox.setPromptText("Ville");
-        styleCombo(cityBox);
-        cityBox.setDisable(true);
-
-        regionBox.valueProperty().addListener((obs, oldValue, newValue) -> {
-            cityBox.getItems().setAll(newValue == null ? List.of() : REGION_CITIES.getOrDefault(newValue, List.of()));
-            cityBox.getSelectionModel().clearSelection();
-            cityBox.setDisable(newValue == null);
+        regionSearchField.textProperty().addListener((obs, oldValue, newValue) -> {
+            if (!REGION_CITIES.containsKey(newValue)) {
+                citySearchField.clear();
+                citySearchField.setDisable(true);
+                citySuggestions.getItems().clear();
+            } else {
+                citySearchField.setDisable(false);
+                updateSuggestionSource(citySearchField, REGION_CITIES.getOrDefault(newValue, List.of()));
+            }
         });
 
         GridPane locationRow = new GridPane();
@@ -142,10 +160,10 @@ public class RegisterView extends ScrollPane {
         locationRow.setMaxWidth(Double.MAX_VALUE);
         locationRow.add(new Label("Region"), 0, 0);
         locationRow.add(new Label("Ville"), 1, 0);
-        locationRow.add(regionBox, 0, 1);
-        locationRow.add(cityBox, 1, 1);
-        GridPane.setHgrow(regionBox, Priority.ALWAYS);
-        GridPane.setHgrow(cityBox, Priority.ALWAYS);
+        locationRow.add(regionPicker, 0, 1);
+        locationRow.add(cityPicker, 1, 1);
+        GridPane.setHgrow(regionPicker, Priority.ALWAYS);
+        GridPane.setHgrow(cityPicker, Priority.ALWAYS);
 
         TextField addressLineField = createField("Adresse de maison, rue, appartement...");
 
@@ -162,14 +180,18 @@ public class RegisterView extends ScrollPane {
                 return;
             }
             if (!password.equals(confirmation)) {
-                UIUtils.showError("La confirmation du mot de passe ne correspond pas.");
+                UIUtils.showError("La confirmation du mot de passe ne correspond pas. Saisissez exactement le meme mot de passe dans les deux champs.\n\n" + passwordGuidance());
                 return;
             }
             if (!isValidEmail(email)) {
                 UIUtils.showError("Format d'email invalide.");
                 return;
             }
-            if (regionBox.getValue() == null || cityBox.getValue() == null || addressLineField.getText().isBlank()) {
+            String selectedRegion = regionSearchField.getText().trim();
+            String selectedCity = citySearchField.getText().trim();
+            if (!REGION_CITIES.containsKey(selectedRegion)
+                    || !REGION_CITIES.getOrDefault(selectedRegion, List.of()).contains(selectedCity)
+                    || addressLineField.getText().isBlank()) {
                 UIUtils.showError("Selectionnez une region, une ville et completez l'adresse.");
                 return;
             }
@@ -179,7 +201,15 @@ public class RegisterView extends ScrollPane {
             }
 
             String birthDate = formatBirthDate(dayBox.getValue(), monthBox.getValue(), yearBox.getValue());
-            String address = cityBox.getValue() + ", " + regionBox.getValue() + " - " + addressLineField.getText().trim();
+            String passwordError = validatePasswordPolicy(
+                    password,
+                    buildForbiddenTerms(email, nomField.getText().trim(), prenomField.getText().trim(), birthDate)
+            );
+            if (passwordError != null) {
+                UIUtils.showError(passwordError);
+                return;
+            }
+            String address = selectedCity + ", " + selectedRegion + " - " + addressLineField.getText().trim();
 
             try {
                 String message = authService.register(
@@ -206,13 +236,14 @@ public class RegisterView extends ScrollPane {
         homeLink.setOnAction(event -> NavigationManager.navigateTo(new HomeView()));
 
         form.getChildren().addAll(
-                title, subtitle,
+                title, subtitle, requiredHint,
                 nomField, prenomField, emailField, telField,
                 passwordControl, confirmControl,
-                createSectionLabel("Date de naissance"),
+                createSectionLabel("Date de naissance *"),
                 birthRow,
-                createSectionLabel("Adresse"),
+                createSectionLabel("Adresse *"),
                 locationRow,
+                createFieldLabel("Adresse detaillee *"),
                 addressLineField,
                 registerButton, loginButton, homeLink
         );
@@ -236,6 +267,9 @@ public class RegisterView extends ScrollPane {
 
         Label info = new Label("Entrez le code OTP envoye a " + email);
         TextField codeField = createField("Code OTP");
+        Label otpAttemptLabel = new Label();
+        otpAttemptLabel.setWrapText(true);
+        otpAttemptLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9b2226;");
         Hyperlink resendLink = new Hyperlink("Renvoyer le code");
         resendLink.setStyle("-fx-text-fill: #1d5f52;");
         resendLink.setOnAction(event -> {
@@ -246,18 +280,43 @@ public class RegisterView extends ScrollPane {
             }
         });
 
-        VBox content = new VBox(12, info, codeField, resendLink);
+        VBox content = new VBox(12, info, codeField, otpAttemptLabel, resendLink);
         pane.setContent(content);
 
-        Optional<ButtonType> result = dialog.showAndWait();
-        if (result.isPresent() && result.get() == ButtonType.OK) {
+        Button okButton = (Button) pane.lookupButton(ButtonType.OK);
+        final int[] otpAttempts = {0};
+        okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            if (otpAttempts[0] >= MAX_ATTEMPTS) {
+                UIUtils.showError("Vous avez atteint la limite de 5 essais pour la verification du code.");
+                event.consume();
+                return;
+            }
             try {
                 UIUtils.showSuccess(authService.verifyEmail(email, codeField.getText().trim()));
+                otpAttempts[0] = 0;
+                otpAttemptLabel.setText("");
                 NavigationManager.navigateTo(new LoginView());
             } catch (Exception e) {
-                UIUtils.showError(e.getMessage());
+                otpAttempts[0]++;
+                otpAttemptLabel.setText(formatAttemptMessage("verification du code", otpAttempts[0]));
+                if (otpAttempts[0] >= MAX_ATTEMPTS) {
+                    okButton.setDisable(true);
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("verification du code", otpAttempts[0]) + "). Limite de 5 essais atteinte.");
+                } else {
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("verification du code", otpAttempts[0]) + ")");
+                }
+                event.consume();
             }
+        });
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get().getButtonData() == ButtonBar.ButtonData.CANCEL_CLOSE) {
+            dialog.close();
         }
+    }
+
+    private String formatAttemptMessage(String context, int attempts) {
+        return "Nombre d'essais " + context + " : " + attempts;
     }
 
     private Label createSectionLabel(String text) {
@@ -287,6 +346,72 @@ public class RegisterView extends ScrollPane {
         comboBox.setMaxWidth(Double.MAX_VALUE);
         comboBox.setStyle(ViewFactory.inputStyle());
         HBox.setHgrow(comboBox, Priority.ALWAYS);
+    }
+
+    private ListView<String> createSuggestionList() {
+        ListView<String> suggestionList = new ListView<>();
+        suggestionList.setMaxHeight(120);
+        suggestionList.setVisible(false);
+        suggestionList.setManaged(false);
+        suggestionList.setStyle("-fx-background-color: rgba(255,255,255,0.96); -fx-background-radius: 14; "
+                + "-fx-border-color: rgba(25,45,40,0.10); -fx-border-radius: 14;");
+        return suggestionList;
+    }
+
+    private void installAutoComplete(TextField field, ListView<String> suggestionList, List<String> sourceItems,
+                                     java.util.function.Consumer<String> onSelect) {
+        updateSuggestionSource(field, sourceItems);
+        field.textProperty().addListener((obs, oldValue, newValue) -> {
+            @SuppressWarnings("unchecked")
+            List<String> values = (List<String>) field.getProperties().getOrDefault("suggestionSource", List.of());
+            updateSuggestionItems(suggestionList, values, newValue);
+        });
+        suggestionList.setOnMousePressed(event -> {
+            String selectedItem = suggestionList.getSelectionModel().getSelectedItem();
+            if (selectedItem != null) {
+                onSelect.accept(selectedItem);
+                suggestionList.setVisible(false);
+                suggestionList.setManaged(false);
+                event.consume();
+            }
+        });
+        field.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (!focused) {
+                Platform.runLater(() -> {
+                    if (!suggestionList.isFocused()) {
+                        suggestionList.setVisible(false);
+                        suggestionList.setManaged(false);
+                    }
+                });
+            }
+        });
+        suggestionList.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (!focused && !field.isFocused()) {
+                suggestionList.setVisible(false);
+                suggestionList.setManaged(false);
+            }
+        });
+    }
+
+    private void updateSuggestionSource(TextField field, List<String> sourceItems) {
+        field.getProperties().put("suggestionSource", sourceItems);
+    }
+
+    private void updateSuggestionItems(ListView<String> suggestionList, List<String> sourceItems, String query) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+        List<String> filteredItems = sourceItems.stream()
+                .filter(item -> item.toLowerCase().contains(normalizedQuery))
+                .collect(Collectors.toList());
+        suggestionList.getItems().setAll(filteredItems);
+        boolean show = !filteredItems.isEmpty() && !normalizedQuery.isBlank();
+        suggestionList.setVisible(show);
+        suggestionList.setManaged(show);
+    }
+
+    private Label createFieldLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #365048;");
+        return label;
     }
 
     private String formatBirthDate(int day, String monthLabel, int year) {
@@ -327,6 +452,74 @@ public class RegisterView extends ScrollPane {
         String domain = email.substring(atIndex + 1);
         int dotIndex = domain.indexOf('.');
         return dotIndex > 0 && dotIndex < domain.length() - 1;
+    }
+
+    private String validatePasswordPolicy(String password, String... forbiddenTerms) {
+        if (password == null || password.isBlank()) {
+            return "Mot de passe obligatoire.\n\n" + passwordGuidance();
+        }
+        if (password.length() < 8) {
+            return "Mot de passe trop faible: il doit contenir au moins 8 caracteres.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isUpperCase)) {
+            return "Mot de passe trop faible: ajoutez au moins une lettre majuscule.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isLowerCase)) {
+            return "Mot de passe trop faible: ajoutez au moins une lettre minuscule.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(Character::isDigit)) {
+            return "Mot de passe trop faible: ajoutez au moins un chiffre.\n\n" + passwordGuidance();
+        }
+        if (password.chars().noneMatch(ch -> !Character.isLetterOrDigit(ch))) {
+            return "Mot de passe trop faible: ajoutez au moins un caractere special.\n\n" + passwordGuidance();
+        }
+        if (containsForbiddenTerm(password, forbiddenTerms)) {
+            return "Mot de passe refuse: il ne doit pas contenir votre email, votre nom, votre prenom ou votre date de naissance.\n\n" + passwordGuidance();
+        }
+        return null;
+    }
+
+    private String passwordGuidance() {
+        return "Pour corriger le mot de passe, utilisez au minimum 8 caracteres avec 1 majuscule, 1 minuscule, 1 chiffre et 1 caractere special, sans email, nom, prenom ni date de naissance.";
+    }
+
+    private boolean containsForbiddenTerm(String password, String... forbiddenTerms) {
+        String normalizedPassword = password.toLowerCase();
+        for (String term : forbiddenTerms) {
+            if (term == null || term.isBlank()) {
+                continue;
+            }
+            String normalizedTerm = term.trim().toLowerCase();
+            if (normalizedPassword.contains(normalizedTerm)) {
+                return true;
+            }
+            int atIndex = normalizedTerm.indexOf('@');
+            if (atIndex > 0) {
+                String localPart = normalizedTerm.substring(0, atIndex);
+                if (localPart.length() >= 3 && normalizedPassword.contains(localPart)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private String[] buildForbiddenTerms(String email, String nom, String prenom, String birthDate) {
+        return new String[]{
+                email,
+                nom,
+                prenom,
+                birthDate,
+                birthDate == null ? null : birthDate.replace("-", ""),
+                birthDate == null ? null : toFrenchBirthDate(birthDate)
+        };
+    }
+
+    private String toFrenchBirthDate(String birthDate) {
+        if (birthDate == null || birthDate.length() != 10) {
+            return birthDate;
+        }
+        return birthDate.substring(8, 10) + "/" + birthDate.substring(5, 7) + "/" + birthDate.substring(0, 4);
     }
 
     private static Map<String, List<String>> createRegionCities() {

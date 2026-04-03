@@ -60,6 +60,12 @@ public class UserService {
         return user;
     }
 
+    public User getUserByEmail(String email) {
+        User user = userDAO.findByEmail(email);
+        if (user != null) user.setMotDePasse(null);
+        return user;
+    }
+
     // ── Modifier le profil ────────────────────────────
     public boolean updateProfil(User user) {
         return userDAO.updateProfil(user);
