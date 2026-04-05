@@ -2,6 +2,8 @@ package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.NotificationDTO;
 import com.chrionline.client.model.LoginCaptchaDTO;
+import com.chrionline.client.model.LoginResponseDTO;
+import com.chrionline.client.model.UserDTO;
 import com.chrionline.client.service.AuthService;
 import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.session.AppSession;
@@ -145,7 +147,18 @@ public class LoginView extends HBox {
                     captchaAnswer = captchaResponse.captchaAnswer();
                 }
 
-                var user = authService.login(emailField.getText().trim(), passwordField.getValue(), captchaId, captchaAnswer);
+                LoginResponseDTO loginResponse = authService.login(
+                        emailField.getText().trim(),
+                        passwordField.getValue(),
+                        captchaId,
+                        captchaAnswer
+                );
+                UserDTO user = loginResponse.isRequiresOtp()
+                        ? showLoginOtpFlow(loginResponse)
+                        : loginResponse.getUser();
+                if (user == null) {
+                    return;
+                }
                 loginAttempts[0] = 0;
                 lastAttemptEmail[0] = currentEmail;
                 loginAttemptLabel.setText("");
@@ -326,6 +339,50 @@ public class LoginView extends HBox {
             return null;
         }
         return new CaptchaResponse(captcha.getCaptchaId(), answerField.getText().trim());
+    }
+
+    private UserDTO showLoginOtpFlow(LoginResponseDTO loginResponse) throws Exception {
+        UIUtils.showInfo(loginResponse.getMessage());
+
+        Dialog<ButtonType> otpDialog = new Dialog<>();
+        otpDialog.setTitle("Double authentification");
+        DialogPane pane = otpDialog.getDialogPane();
+        ButtonType resendButtonType = new ButtonType("Renvoyer le code", ButtonBar.ButtonData.LEFT);
+        pane.getButtonTypes().addAll(ButtonType.OK, resendButtonType, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        Label helpLabel = new Label("Saisissez le code OTP recu par email pour finaliser la connexion.");
+        helpLabel.setWrapText(true);
+        TextField otpField = new TextField();
+        otpField.setPromptText("Code OTP");
+        otpField.setStyle(ViewFactory.inputStyle());
+        Label statusLabel = new Label();
+        statusLabel.setWrapText(true);
+        statusLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #9b2226;");
+        pane.setContent(new VBox(12, helpLabel, otpField, statusLabel));
+
+        int otpAttempts = 0;
+        while (true) {
+            Optional<ButtonType> result = otpDialog.showAndWait();
+            if (result.isEmpty() || result.get() == ButtonType.CANCEL) {
+                return null;
+            }
+            if (result.get() == resendButtonType) {
+                UIUtils.showInfo(authService.resendLoginOtp(loginResponse.getPendingToken()));
+                statusLabel.setText("");
+                continue;
+            }
+            try {
+                return authService.verifyLoginOtp(loginResponse.getPendingToken(), otpField.getText().trim());
+            } catch (Exception e) {
+                otpAttempts++;
+                statusLabel.setText("Verification OTP echouee : " + otpAttempts);
+                UIUtils.showError(e.getMessage());
+                if (otpAttempts >= MAX_OTP_ATTEMPTS) {
+                    return null;
+                }
+            }
+        }
     }
 
     private String validatePasswordPolicy(String password, String... forbiddenTerms) {

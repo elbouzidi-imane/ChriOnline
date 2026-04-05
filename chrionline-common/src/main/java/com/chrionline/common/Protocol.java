@@ -4,6 +4,8 @@ public class Protocol {
 
     public static final String LOGIN = "LOGIN";
     public static final String GET_LOGIN_CAPTCHA = "GET_LOGIN_CAPTCHA";
+    public static final String VERIFY_LOGIN_OTP = "VERIFY_LOGIN_OTP";
+    public static final String RESEND_LOGIN_OTP = "RESEND_LOGIN_OTP";
     public static final String REGISTER = "REGISTER";
     public static final String LOGOUT = "LOGOUT";
     public static final String VERIFY_EMAIL = "VERIFY_EMAIL";

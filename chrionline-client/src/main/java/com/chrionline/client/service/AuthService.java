@@ -1,6 +1,7 @@
 package com.chrionline.client.service;
 
 import com.chrionline.client.model.LoginCaptchaDTO;
+import com.chrionline.client.model.LoginResponseDTO;
 import com.chrionline.client.model.UserDTO;
 import com.chrionline.client.network.UDPListener;
 import com.chrionline.client.network.TCPClient;
@@ -12,18 +13,29 @@ import com.google.gson.JsonObject;
 public class AuthService {
     private final TCPClient tcp = TCPClient.getInstance();
 
-    public UserDTO login(String email, String mdp) throws Exception {
+    public LoginResponseDTO login(String email, String mdp) throws Exception {
         return login(email, mdp, "", "");
     }
 
-    public UserDTO login(String email, String mdp, String captchaId, String captchaAnswer) throws Exception {
+    public LoginResponseDTO login(String email, String mdp, String captchaId, String captchaAnswer) throws Exception {
         JsonObject payload = new JsonObject();
         payload.addProperty("email", email);
         payload.addProperty("password", mdp);
         payload.addProperty("captchaId", captchaId == null ? "" : captchaId);
         payload.addProperty("captchaAnswer", captchaAnswer == null ? "" : captchaAnswer);
 
-        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.LOGIN, payload.toString()).getPayload(), UserDTO.class);
+        return JsonUtils.GSON.fromJson(send(Protocol.LOGIN, payload.toString()).getPayload(), LoginResponseDTO.class);
+    }
+
+    public LoginCaptchaDTO getLoginCaptcha(String email) throws Exception {
+        return JsonUtils.GSON.fromJson(send(Protocol.GET_LOGIN_CAPTCHA, email).getPayload(), LoginCaptchaDTO.class);
+    }
+
+    public UserDTO verifyLoginOtp(String pendingToken, String code) throws Exception {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("pendingToken", pendingToken);
+        payload.addProperty("code", code);
+        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.VERIFY_LOGIN_OTP, payload.toString()).getPayload(), UserDTO.class);
         int udpPort = UDPListener.getBoundPort();
         if (udpPort > 0) {
             send(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
@@ -31,8 +43,8 @@ public class AuthService {
         return user;
     }
 
-    public LoginCaptchaDTO getLoginCaptcha(String email) throws Exception {
-        return JsonUtils.GSON.fromJson(send(Protocol.GET_LOGIN_CAPTCHA, email).getPayload(), LoginCaptchaDTO.class);
+    public String resendLoginOtp(String pendingToken) throws Exception {
+        return send(Protocol.RESEND_LOGIN_OTP, pendingToken).getPayload();
     }
 
     public String register(String nom, String prenom, String email, String mdp, String tel, String adresse, String dateNaissance) throws Exception {

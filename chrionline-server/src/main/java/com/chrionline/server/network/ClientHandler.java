@@ -62,6 +62,8 @@ public class ClientHandler implements Runnable {
         return switch (req.getType()) {
             case Protocol.LOGIN,
                  Protocol.GET_LOGIN_CAPTCHA,
+                 Protocol.VERIFY_LOGIN_OTP,
+                 Protocol.RESEND_LOGIN_OTP,
                  Protocol.REGISTER,
                  Protocol.LOGOUT,
                  Protocol.VERIFY_EMAIL,
@@ -138,7 +140,7 @@ public class ClientHandler implements Runnable {
         if (Protocol.LOGIN.equals(request.getType())) {
             try {
                 JsonObject user = JsonParser.parseString(response.getPayload()).getAsJsonObject();
-                if (user != null) {
+                if (user != null && user.has("id")) {
                     int newUserId = user.get("id").getAsInt();
                     if (currentUserId > 0 && currentUserId != newUserId) {
                         ConnectedClientRegistry.unregisterUser(currentUserId);
@@ -151,6 +153,25 @@ public class ClientHandler implements Runnable {
                 }
             } catch (Exception e) {
                 System.err.println("ClientHandler.updateConnectionRegistry login : " + e.getMessage());
+            }
+            return;
+        }
+        if (Protocol.VERIFY_LOGIN_OTP.equals(request.getType())) {
+            try {
+                JsonObject user = JsonParser.parseString(response.getPayload()).getAsJsonObject();
+                if (user != null && user.has("id")) {
+                    int newUserId = user.get("id").getAsInt();
+                    if (currentUserId > 0 && currentUserId != newUserId) {
+                        ConnectedClientRegistry.unregisterUser(currentUserId);
+                    }
+                    currentUserId = newUserId;
+                    String role = user.has("role") && !user.get("role").isJsonNull()
+                            ? user.get("role").getAsString()
+                            : "";
+                    currentUserAdmin = "ADMIN".equalsIgnoreCase(role);
+                }
+            } catch (Exception e) {
+                System.err.println("ClientHandler.updateConnectionRegistry otp : " + e.getMessage());
             }
             return;
         }

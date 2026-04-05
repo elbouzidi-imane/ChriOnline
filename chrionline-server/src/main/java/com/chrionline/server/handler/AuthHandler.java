@@ -6,6 +6,7 @@ import com.chrionline.server.model.User;
 import com.chrionline.server.security.PasswordPolicy;
 import com.chrionline.server.service.LoginCaptchaService;
 import com.chrionline.server.service.LoginAttemptService;
+import com.chrionline.server.service.LoginTwoFactorService;
 import com.chrionline.server.service.NotificationService;
 import com.chrionline.server.service.UserService;
 import com.google.gson.Gson;
@@ -22,12 +23,15 @@ public class AuthHandler {
     private final NotificationService notificationService = new NotificationService();
     private final LoginCaptchaService loginCaptchaService = LoginCaptchaService.getInstance();
     private final LoginAttemptService loginAttemptService = LoginAttemptService.getInstance();
+    private final LoginTwoFactorService loginTwoFactorService = LoginTwoFactorService.getInstance();
     private final Gson gson = new Gson();
 
     public Message handle(Message request, String clientIp) {
         return switch (request.getType()) {
             case Protocol.LOGIN -> handleLogin(request, clientIp);
             case Protocol.GET_LOGIN_CAPTCHA -> handleGetLoginCaptcha(request, clientIp);
+            case Protocol.VERIFY_LOGIN_OTP -> handleVerifyLoginOtp(request, clientIp);
+            case Protocol.RESEND_LOGIN_OTP -> handleResendLoginOtp(request);
             case Protocol.REGISTER -> handleRegister(request);
             case Protocol.LOGOUT -> handleLogout(request);
             case Protocol.VERIFY_EMAIL -> handleVerifyEmail(request);
@@ -79,9 +83,15 @@ public class AuthHandler {
             LOGGER.info("Echec de connexion pour email={}, ip={}", email, clientIp);
             return Message.error(GENERIC_LOGIN_ERROR);
         }
-        loginAttemptService.recordSuccess(email, clientIp);
-        LOGGER.info("Connexion reussie pour email={}, ip={}", email, clientIp);
-        return Message.ok(Protocol.LOGIN, gson.toJson(user));
+        LoginTwoFactorService.LoginChallenge challenge;
+        try {
+            challenge = loginTwoFactorService.initiate(user);
+        } catch (Exception e) {
+            LOGGER.error("Envoi OTP de connexion impossible pour email={}, ip={}", email, clientIp, e);
+            return Message.error("Impossible d'envoyer le code OTP de connexion.");
+        }
+        LOGGER.info("OTP de connexion envoye pour email={}, ip={}", email, clientIp);
+        return Message.ok(Protocol.LOGIN, gson.toJson(new LoginResponse(true, challenge.pendingToken(), challenge.message(), null)));
     }
 
     private Message handleGetLoginCaptcha(Message req, String clientIp) {
@@ -94,6 +104,31 @@ public class AuthHandler {
             return Message.error("Trop de tentatives de connexion. Reessayez dans quelques minutes.");
         }
         return Message.ok(Protocol.GET_LOGIN_CAPTCHA, gson.toJson(loginCaptchaService.createChallenge(email, clientIp)));
+    }
+
+    private Message handleVerifyLoginOtp(Message req, String clientIp) {
+        OtpVerificationRequest verificationRequest = parseOtpVerificationRequest(req.getPayload());
+        User user = loginTwoFactorService.verify(verificationRequest.pendingToken(), verificationRequest.code());
+        if (user == null) {
+            LOGGER.info("Echec verification OTP de connexion ip={}", clientIp);
+            return Message.error("Code OTP invalide ou expire.");
+        }
+        loginAttemptService.recordSuccess(user.getEmail(), clientIp);
+        LOGGER.info("Connexion 2FA reussie pour email={}, ip={}", user.getEmail(), clientIp);
+        return Message.ok(Protocol.VERIFY_LOGIN_OTP, gson.toJson(user));
+    }
+
+    private Message handleResendLoginOtp(Message req) {
+        String pendingToken = req.getPayload() == null ? "" : req.getPayload().trim();
+        try {
+            if (!loginTwoFactorService.resend(pendingToken)) {
+                return Message.error("Impossible de renvoyer le code OTP.");
+            }
+        } catch (Exception e) {
+            LOGGER.error("Renvoi OTP de connexion impossible", e);
+            return Message.error("Impossible de renvoyer le code OTP.");
+        }
+        return Message.ok(Protocol.RESEND_LOGIN_OTP, "Un nouveau code OTP a ete envoye par email.");
     }
 
     private Message handleRegister(Message req) {
@@ -319,5 +354,22 @@ public class AuthHandler {
     }
 
     private record LoginRequest(String email, String password, String captchaId, String captchaAnswer) {
+    }
+
+    private OtpVerificationRequest parseOtpVerificationRequest(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return new OtpVerificationRequest("", "");
+        }
+        JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+        return new OtpVerificationRequest(
+                getJsonString(json, "pendingToken"),
+                getJsonString(json, "code")
+        );
+    }
+
+    private record OtpVerificationRequest(String pendingToken, String code) {
+    }
+
+    private record LoginResponse(boolean requiresOtp, String pendingToken, String message, User user) {
     }
 }

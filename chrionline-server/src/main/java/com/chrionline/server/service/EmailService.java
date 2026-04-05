@@ -113,6 +113,24 @@ public class EmailService {
         return sendTextEmail(to, subject, body);
     }
 
+    public boolean sendLoginOtpEmail(String to, String code) {
+        String subject = "ChriOnline - Code de connexion";
+        String body = """
+                Bonjour,
+
+                Une tentative de connexion a ete validee avec votre mot de passe.
+
+                Votre code OTP de connexion est : %s
+
+                Ce code est valable pendant 10 minutes.
+
+                Si vous n'etes pas a l'origine de cette connexion, changez votre mot de passe.
+
+                L'equipe ChriOnline
+                """.formatted(code);
+        return sendTextEmail(to, subject, body);
+    }
+
     public boolean sendOrderConfirmationEmail(String to, String nom,
                                               String reference, double total,
                                               boolean notificationsActivees) {
