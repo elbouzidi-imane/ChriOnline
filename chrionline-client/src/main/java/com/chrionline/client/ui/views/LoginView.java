@@ -1,6 +1,7 @@
 package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.NotificationDTO;
+import com.chrionline.client.model.LoginCaptchaDTO;
 import com.chrionline.client.service.AuthService;
 import com.chrionline.client.service.NotificationService;
 import com.chrionline.client.session.AppSession;
@@ -30,7 +31,9 @@ import java.util.List;
 import java.util.Optional;
 
 public class LoginView extends HBox {
-    private static final int MAX_ATTEMPTS = 5;
+    private static final int CAPTCHA_THRESHOLD = 3;
+    private static final int MAX_LOGIN_ATTEMPTS = 6;
+    private static final int MAX_OTP_ATTEMPTS = 5;
 
     private final AuthService authService = new AuthService();
     private final NotificationService notificationService = new NotificationService();
@@ -126,15 +129,27 @@ public class LoginView extends HBox {
                 loginButton.setDisable(false);
                 lastAttemptEmail[0] = currentEmail;
             }
-            if (loginAttempts[0] >= MAX_ATTEMPTS) {
-                UIUtils.showError("Vous avez atteint la limite de 5 essais d'authentification.");
+            if (loginAttempts[0] >= MAX_LOGIN_ATTEMPTS) {
+                UIUtils.showError("Vous avez atteint la limite de tentatives d'authentification.");
                 return;
             }
             try {
-                var user = authService.login(emailField.getText().trim(), passwordField.getValue());
+                String captchaId = "";
+                String captchaAnswer = "";
+                if (isCaptchaRequired(loginAttempts[0])) {
+                    CaptchaResponse captchaResponse = promptForCaptcha(emailField.getText().trim());
+                    if (captchaResponse == null) {
+                        return;
+                    }
+                    captchaId = captchaResponse.captchaId();
+                    captchaAnswer = captchaResponse.captchaAnswer();
+                }
+
+                var user = authService.login(emailField.getText().trim(), passwordField.getValue(), captchaId, captchaAnswer);
                 loginAttempts[0] = 0;
                 lastAttemptEmail[0] = currentEmail;
                 loginAttemptLabel.setText("");
+                loginButton.setDisable(false);
                 AppSession.setCurrentUser(user);
                 showPendingNotifications();
                 if (user.isAdmin()) {
@@ -145,9 +160,9 @@ public class LoginView extends HBox {
             } catch (Exception e) {
                 loginAttempts[0]++;
                 loginAttemptLabel.setText(formatAttemptMessage("authentification", loginAttempts[0]));
-                if (loginAttempts[0] >= MAX_ATTEMPTS) {
+                if (loginAttempts[0] >= MAX_LOGIN_ATTEMPTS) {
                     loginButton.setDisable(true);
-                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("authentification", loginAttempts[0]) + "). Limite de 5 essais atteinte.");
+                    UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("authentification", loginAttempts[0]) + "). Limite de tentatives atteinte.");
                 } else {
                     UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("authentification", loginAttempts[0]) + ")");
                 }
@@ -246,7 +261,7 @@ public class LoginView extends HBox {
                 event.consume();
                 return;
             }
-            if (otpAttempts[0] >= MAX_ATTEMPTS) {
+            if (otpAttempts[0] >= MAX_OTP_ATTEMPTS) {
                 UIUtils.showError("Vous avez atteint la limite de 5 essais pour la verification du code.");
                 event.consume();
                 return;
@@ -259,7 +274,7 @@ public class LoginView extends HBox {
             } catch (Exception e) {
                 otpAttempts[0]++;
                 otpAttemptLabel.setText(formatAttemptMessage("verification du code", otpAttempts[0]));
-                if (otpAttempts[0] >= MAX_ATTEMPTS) {
+                if (otpAttempts[0] >= MAX_OTP_ATTEMPTS) {
                     okButton.setDisable(true);
                     UIUtils.showError(e.getMessage() + " (" + formatAttemptMessage("verification du code", otpAttempts[0]) + "). Limite de 5 essais atteinte.");
                 } else {
@@ -277,6 +292,40 @@ public class LoginView extends HBox {
 
     private String formatAttemptMessage(String context, int attempts) {
         return "Nombre d'essais " + context + " : " + attempts;
+    }
+
+    private boolean isCaptchaRequired(int failedAttempts) {
+        return failedAttempts >= CAPTCHA_THRESHOLD - 1;
+    }
+
+    private CaptchaResponse promptForCaptcha(String email) throws Exception {
+        if (email == null || email.isBlank()) {
+            UIUtils.showError("Saisissez l'email avant de valider le CAPTCHA.");
+            return null;
+        }
+
+        LoginCaptchaDTO captcha = authService.getLoginCaptcha(email.trim());
+        Dialog<ButtonType> captchaDialog = new Dialog<>();
+        captchaDialog.setTitle("Verification CAPTCHA");
+        DialogPane pane = captchaDialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        Label infoLabel = new Label("Pour continuer, resolvez ce challenge.");
+        infoLabel.setWrapText(true);
+        Label challengeLabel = new Label(captcha.getChallengeText());
+        challengeLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #162521;");
+        TextField answerField = new TextField();
+        answerField.setPromptText("Votre reponse");
+        answerField.setStyle(ViewFactory.inputStyle());
+
+        pane.setContent(new VBox(12, infoLabel, challengeLabel, answerField));
+
+        Optional<ButtonType> result = captchaDialog.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return null;
+        }
+        return new CaptchaResponse(captcha.getCaptchaId(), answerField.getText().trim());
     }
 
     private String validatePasswordPolicy(String password, String... forbiddenTerms) {
@@ -374,5 +423,8 @@ public class LoginView extends HBox {
         private String getValue() {
             return visibleField.isVisible() ? visibleField.getText() : passwordField.getText();
         }
+    }
+
+    private record CaptchaResponse(String captchaId, String captchaAnswer) {
     }
 }

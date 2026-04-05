@@ -3,6 +3,7 @@ package com.chrionline.common;
 public class Protocol {
 
     public static final String LOGIN = "LOGIN";
+    public static final String GET_LOGIN_CAPTCHA = "GET_LOGIN_CAPTCHA";
     public static final String REGISTER = "REGISTER";
     public static final String LOGOUT = "LOGOUT";
     public static final String VERIFY_EMAIL = "VERIFY_EMAIL";

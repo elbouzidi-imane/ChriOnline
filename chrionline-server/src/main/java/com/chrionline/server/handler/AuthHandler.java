@@ -4,10 +4,13 @@ import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.User;
 import com.chrionline.server.security.PasswordPolicy;
+import com.chrionline.server.service.LoginCaptchaService;
 import com.chrionline.server.service.LoginAttemptService;
 import com.chrionline.server.service.NotificationService;
 import com.chrionline.server.service.UserService;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,12 +20,14 @@ public class AuthHandler {
 
     private final UserService userService = new UserService();
     private final NotificationService notificationService = new NotificationService();
+    private final LoginCaptchaService loginCaptchaService = LoginCaptchaService.getInstance();
     private final LoginAttemptService loginAttemptService = LoginAttemptService.getInstance();
     private final Gson gson = new Gson();
 
     public Message handle(Message request, String clientIp) {
         return switch (request.getType()) {
             case Protocol.LOGIN -> handleLogin(request, clientIp);
+            case Protocol.GET_LOGIN_CAPTCHA -> handleGetLoginCaptcha(request, clientIp);
             case Protocol.REGISTER -> handleRegister(request);
             case Protocol.LOGOUT -> handleLogout(request);
             case Protocol.VERIFY_EMAIL -> handleVerifyEmail(request);
@@ -42,18 +47,15 @@ public class AuthHandler {
     }
 
     private Message handleLogin(Message req, String clientIp) {
-        String payload = req.getPayload();
-        if (payload == null || !payload.contains(":")) {
-            return Message.error("Format invalide. Attendu : email:motdepasse");
-        }
-        int separateur = payload.indexOf(":");
-        String email = payload.substring(0, separateur).trim();
-        String mdp = payload.substring(separateur + 1).trim();
+        LoginRequest loginRequest = parseLoginRequest(req.getPayload());
+        String email = loginRequest.email();
+        String mdp = loginRequest.password();
         if (email.isEmpty() || mdp.isEmpty()) {
             return Message.error("Email et mot de passe obligatoires");
         }
 
-        LoginAttemptService.RateLimitDecision decision = loginAttemptService.check(email, clientIp);
+        LoginAttemptService.LoginSecurityState securityState = loginAttemptService.getSecurityState(email, clientIp);
+        LoginAttemptService.RateLimitDecision decision = securityState.decision();
         if (decision.blocked()) {
             LOGGER.warn(
                     "Tentative de login refusee pour rate limiting scope={}, key={}, ip={}, retryAfter={}s",
@@ -63,6 +65,12 @@ public class AuthHandler {
                     decision.retryAfterSeconds()
             );
             return Message.error("Trop de tentatives de connexion. Reessayez dans quelques minutes.");
+        }
+        if (securityState.captchaRequired()
+                && !loginCaptchaService.validate(email, clientIp, loginRequest.captchaId(), loginRequest.captchaAnswer())) {
+            loginAttemptService.recordFailure(email, clientIp);
+            LOGGER.info("Echec verification captcha pour email={}, ip={}", email, clientIp);
+            return Message.error("CAPTCHA invalide ou manquant. Un nouveau CAPTCHA est requis.");
         }
 
         User user = userService.login(email, mdp);
@@ -74,6 +82,18 @@ public class AuthHandler {
         loginAttemptService.recordSuccess(email, clientIp);
         LOGGER.info("Connexion reussie pour email={}, ip={}", email, clientIp);
         return Message.ok(Protocol.LOGIN, gson.toJson(user));
+    }
+
+    private Message handleGetLoginCaptcha(Message req, String clientIp) {
+        String email = req.getPayload() == null ? "" : req.getPayload().trim();
+        if (email.isEmpty()) {
+            return Message.error("Email obligatoire pour generer le CAPTCHA");
+        }
+        LoginAttemptService.LoginSecurityState securityState = loginAttemptService.getSecurityState(email, clientIp);
+        if (securityState.decision().blocked()) {
+            return Message.error("Trop de tentatives de connexion. Reessayez dans quelques minutes.");
+        }
+        return Message.ok(Protocol.GET_LOGIN_CAPTCHA, gson.toJson(loginCaptchaService.createChallenge(email, clientIp)));
     }
 
     private Message handleRegister(Message req) {
@@ -264,5 +284,40 @@ public class AuthHandler {
         } catch (Exception e) {
             return Message.error("Erreur : " + e.getMessage());
         }
+    }
+
+    private LoginRequest parseLoginRequest(String payload) {
+        if (payload == null || payload.isBlank()) {
+            return new LoginRequest("", "", "", "");
+        }
+        if (payload.trim().startsWith("{")) {
+            JsonObject json = JsonParser.parseString(payload).getAsJsonObject();
+            return new LoginRequest(
+                    getJsonString(json, "email"),
+                    getJsonString(json, "password"),
+                    getJsonString(json, "captchaId"),
+                    getJsonString(json, "captchaAnswer")
+            );
+        }
+        if (!payload.contains(":")) {
+            return new LoginRequest("", "", "", "");
+        }
+        int separator = payload.indexOf(":");
+        return new LoginRequest(
+                payload.substring(0, separator).trim(),
+                payload.substring(separator + 1).trim(),
+                "",
+                ""
+        );
+    }
+
+    private String getJsonString(JsonObject json, String property) {
+        if (!json.has(property) || json.get(property).isJsonNull()) {
+            return "";
+        }
+        return json.get(property).getAsString().trim();
+    }
+
+    private record LoginRequest(String email, String password, String captchaId, String captchaAnswer) {
     }
 }

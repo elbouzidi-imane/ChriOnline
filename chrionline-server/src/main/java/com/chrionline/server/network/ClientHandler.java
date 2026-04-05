@@ -61,6 +61,7 @@ public class ClientHandler implements Runnable {
     private Message route(Message req) {
         return switch (req.getType()) {
             case Protocol.LOGIN,
+                 Protocol.GET_LOGIN_CAPTCHA,
                  Protocol.REGISTER,
                  Protocol.LOGOUT,
                  Protocol.VERIFY_EMAIL,

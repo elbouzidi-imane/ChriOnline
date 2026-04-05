@@ -1,22 +1,38 @@
 package com.chrionline.client.service;
 
+import com.chrionline.client.model.LoginCaptchaDTO;
 import com.chrionline.client.model.UserDTO;
 import com.chrionline.client.network.UDPListener;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.util.JsonUtils;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
+import com.google.gson.JsonObject;
 
 public class AuthService {
     private final TCPClient tcp = TCPClient.getInstance();
 
     public UserDTO login(String email, String mdp) throws Exception {
-        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.LOGIN, email + ":" + mdp).getPayload(), UserDTO.class);
+        return login(email, mdp, "", "");
+    }
+
+    public UserDTO login(String email, String mdp, String captchaId, String captchaAnswer) throws Exception {
+        JsonObject payload = new JsonObject();
+        payload.addProperty("email", email);
+        payload.addProperty("password", mdp);
+        payload.addProperty("captchaId", captchaId == null ? "" : captchaId);
+        payload.addProperty("captchaAnswer", captchaAnswer == null ? "" : captchaAnswer);
+
+        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.LOGIN, payload.toString()).getPayload(), UserDTO.class);
         int udpPort = UDPListener.getBoundPort();
         if (udpPort > 0) {
             send(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
         }
         return user;
+    }
+
+    public LoginCaptchaDTO getLoginCaptcha(String email) throws Exception {
+        return JsonUtils.GSON.fromJson(send(Protocol.GET_LOGIN_CAPTCHA, email).getPayload(), LoginCaptchaDTO.class);
     }
 
     public String register(String nom, String prenom, String email, String mdp, String tel, String adresse, String dateNaissance) throws Exception {
