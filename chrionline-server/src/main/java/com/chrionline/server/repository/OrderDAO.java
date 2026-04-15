@@ -84,6 +84,31 @@ public class OrderDAO {
         return orders;
     }
 
+    public List<Order> findRecentValidatedByUser(int userId, Timestamp since) {
+        String sql = """
+        SELECT * FROM commande
+        WHERE utilisateur_id = ?
+          AND statut = 'VALIDEE'
+          AND date_commande >= ?
+        ORDER BY date_commande DESC
+        """;
+        List<Order> orders = new ArrayList<>();
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setTimestamp(2, since);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                Order order = mapRow(rs);
+                order.setLignes(findLines(order.getId()));
+                orders.add(order);
+            }
+        } catch (Exception e) {
+            System.err.println("OrderDAO.findRecentValidatedByUser : " + e.getMessage());
+        }
+        return orders;
+    }
+
     // ── Commande par id ───────────────────────────────
     public Order findById(int id) {
         String sql = "SELECT * FROM commande WHERE id = ?";

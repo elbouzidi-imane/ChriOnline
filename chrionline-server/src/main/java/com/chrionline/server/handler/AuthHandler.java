@@ -4,6 +4,7 @@ import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.User;
 import com.chrionline.server.security.PasswordPolicy;
+import com.chrionline.server.security.SessionSecurityService;
 import com.chrionline.server.service.LoginCaptchaService;
 import com.chrionline.server.service.LoginAttemptService;
 import com.chrionline.server.service.LoginTwoFactorService;
@@ -24,6 +25,7 @@ public class AuthHandler {
     private final LoginCaptchaService loginCaptchaService = LoginCaptchaService.getInstance();
     private final LoginAttemptService loginAttemptService = LoginAttemptService.getInstance();
     private final LoginTwoFactorService loginTwoFactorService = LoginTwoFactorService.getInstance();
+    private final SessionSecurityService sessionSecurityService = SessionSecurityService.getInstance();
     private final Gson gson = new Gson();
 
     public Message handle(Message request, String clientIp) {
@@ -113,6 +115,7 @@ public class AuthHandler {
             LOGGER.info("Echec verification OTP de connexion ip={}", clientIp);
             return Message.error("Code OTP invalide ou expire.");
         }
+        user.setSessionToken(sessionSecurityService.createSession(user, clientIp));
         loginAttemptService.recordSuccess(user.getEmail(), clientIp);
         LOGGER.info("Connexion 2FA reussie pour email={}, ip={}", user.getEmail(), clientIp);
         return Message.ok(Protocol.VERIFY_LOGIN_OTP, gson.toJson(user));
@@ -165,6 +168,7 @@ public class AuthHandler {
     }
 
     private Message handleLogout(Message req) {
+        sessionSecurityService.invalidate(req.getSessionToken());
         return Message.ok(Protocol.LOGOUT, "Deconnexion reussie");
     }
 

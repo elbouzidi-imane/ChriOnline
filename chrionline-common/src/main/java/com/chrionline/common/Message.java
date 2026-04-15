@@ -1,72 +1,96 @@
 package com.chrionline.common;
 
 import java.io.Serializable;
+import java.util.UUID;
 
-/**
- * Objet échangé entre client et serveur via TCP (ObjectOutputStream).
- *
- * Exemple envoi :
- *   Message req = new Message(Protocol.LOGIN, "jean@email.com:monmdp");
- *
- * Exemple réponse :
- *   Message rep = Message.ok(Protocol.LOGIN, "CLIENT:42");
- *   Message err = Message.error("Identifiants incorrects");
- */
 public class Message implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private String type;      // code Protocol : LOGIN, GET_PRODUCTS...
-    private String payload;   // données : JSON, texte délimité, ou vide
-    private String status;    // "OK" ou "ERROR"
+    private String type;
+    private String payload;
+    private String status;
+    private String requestId;
+    private long timestamp;
+    private String sessionToken;
 
-    // ── Constructeurs ────────────────────────────────
-
-    public Message() {}
-
-    public Message(String type, String payload) {
-        this.type    = type;
-        this.payload = payload;
-        this.status  = Protocol.OK;
+    public Message() {
     }
 
-    // ── Factories statiques ───────────────────────────
+    public Message(String type, String payload) {
+        this.type = type;
+        this.payload = payload;
+        this.status = Protocol.OK;
+        this.requestId = UUID.randomUUID().toString();
+        this.timestamp = System.currentTimeMillis();
+    }
 
-    /** Crée une réponse OK avec données */
     public static Message ok(String type, String payload) {
         return new Message(type, payload);
     }
 
-    /** Crée une réponse OK sans données */
     public static Message ok(String type) {
         return new Message(type, "");
     }
 
-    /** Crée une réponse ERROR avec la raison */
     public static Message error(String reason) {
-        Message m = new Message(Protocol.ERROR, reason);
-        m.status = Protocol.ERROR;
-        return m;
+        Message message = new Message(Protocol.ERROR, reason);
+        message.status = Protocol.ERROR;
+        return message;
     }
 
-    // ── Getters / Setters ─────────────────────────────
+    public String getType() {
+        return type;
+    }
 
-    public String getType()    { return type; }
-    public String getPayload() { return payload; }
-    public String getStatus()  { return status; }
+    public String getPayload() {
+        return payload;
+    }
 
-    public void setType(String type)       { this.type    = type; }
-    public void setPayload(String payload) { this.payload = payload; }
-    public void setStatus(String status)   { this.status  = status; }
+    public String getStatus() {
+        return status;
+    }
 
-    // ── Utilitaires ───────────────────────────────────
+    public String getRequestId() {
+        return requestId;
+    }
 
-    /** Retourne true si le serveur a répondu OK */
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public String getSessionToken() {
+        return sessionToken;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setPayload(String payload) {
+        this.payload = payload;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public void setSessionToken(String sessionToken) {
+        this.sessionToken = sessionToken;
+    }
+
     public boolean isOk() {
         return Protocol.OK.equals(status);
     }
 
-    /** Retourne true si le serveur a répondu ERROR */
     public boolean isError() {
         return Protocol.ERROR.equals(status);
     }
@@ -74,6 +98,6 @@ public class Message implements Serializable {
     @Override
     public String toString() {
         return "Message{type='" + type + "', status='" + status
-                + "', payload='" + payload + "'}";
+                + "', requestId='" + requestId + "', payload='" + payload + "'}";
     }
 }

@@ -14,13 +14,17 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.UUID;
 
 public class OrderService {
     private final TCPClient tcp = TCPClient.getInstance();
 
     public String placeOrder(String adresse, String modePaiement, String modeLivraison, String promoCode) throws Exception {
+        String nonce = UUID.randomUUID().toString();
+        long timestamp = System.currentTimeMillis();
         String payload = AppSession.getCurrentUser().getId() + "|" + adresse + "|" + modePaiement + "|" + modeLivraison
-                + "|" + (promoCode == null ? "" : promoCode.trim());
+                + "|" + (promoCode == null ? "" : promoCode.trim())
+                + "|" + nonce + "|" + timestamp;
         Message response = tcp.send(new Message(Protocol.PLACE_ORDER, payload));
         if (response.isError()) {
             throw new IllegalStateException(response.getPayload());
@@ -38,7 +42,10 @@ public class OrderService {
     }
 
     public OrderDTO getOrderById(int id) throws Exception {
-        Message response = tcp.send(new Message(Protocol.GET_ORDER, String.valueOf(id)));
+        Message response = tcp.send(new Message(
+                Protocol.GET_ORDER,
+                AppSession.getCurrentUser().getId() + "|" + id
+        ));
         if (response.isError()) {
             throw new IllegalStateException(response.getPayload());
         }
@@ -46,7 +53,8 @@ public class OrderService {
     }
 
     public String pay(String modePaiement, double montant) throws Exception {
-        String payload = AppSession.getCurrentUser().getId() + "|" + modePaiement + "|" + montant;
+        String payload = AppSession.getCurrentUser().getId() + "|" + modePaiement + "|" + montant
+                + "|" + UUID.randomUUID() + "|" + System.currentTimeMillis();
         Message response = tcp.send(new Message(Protocol.PAY, payload));
         if (response.isError()) {
             throw new IllegalStateException(response.getPayload());

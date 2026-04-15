@@ -10,6 +10,8 @@ import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.google.gson.JsonObject;
 
+import java.lang.reflect.Method;
+
 public class AuthService {
     private final TCPClient tcp = TCPClient.getInstance();
 
@@ -38,7 +40,12 @@ public class AuthService {
         UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.VERIFY_LOGIN_OTP, payload.toString()).getPayload(), UserDTO.class);
         int udpPort = UDPListener.getBoundPort();
         if (udpPort > 0) {
-            send(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
+            Message udpRegistration = new Message(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
+            setMessageSessionToken(udpRegistration, user.getSessionToken());
+            Message response = tcp.send(udpRegistration);
+            if (response.isError()) {
+                throw new IllegalStateException(response.getPayload());
+            }
         }
         return user;
     }
@@ -98,6 +105,7 @@ public class AuthService {
 
     public void logout() throws Exception {
         tcp.send(new Message(Protocol.LOGOUT, ""));
+        com.chrionline.client.session.AppSession.clear();
     }
 
     private Message send(String type, String payload) throws Exception {
@@ -106,5 +114,13 @@ public class AuthService {
             throw new IllegalStateException(response.getPayload());
         }
         return response;
+    }
+
+    private void setMessageSessionToken(Message message, String sessionToken) {
+        try {
+            Method setter = message.getClass().getMethod("setSessionToken", String.class);
+            setter.invoke(message, sessionToken);
+        } catch (Exception ignored) {
+        }
     }
 }

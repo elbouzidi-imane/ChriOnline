@@ -1,13 +1,16 @@
 package com.chrionline.client.network;
 
+import com.chrionline.client.session.AppSession;
 import com.chrionline.common.AppConstants;
 import com.chrionline.common.Message;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.util.UUID;
 
 public class TCPClient {
     private static final TCPClient INSTANCE = new TCPClient();
@@ -46,6 +49,7 @@ public class TCPClient {
         if (!isConnected()) {
             connect();
         }
+        hydrateSecurityMetadata(request);
         out.writeObject(request);
         out.flush();
         Object response = in.readObject();
@@ -95,6 +99,54 @@ public class TCPClient {
         try {
             disconnect();
         } catch (IOException ignored) {
+        }
+    }
+
+    private void hydrateSecurityMetadata(Message request) {
+        if (request == null) {
+            return;
+        }
+        String requestId = readStringMethod(request, "getRequestId");
+        if (requestId == null || requestId.isBlank()) {
+            invokeIfPresent(request, "setRequestId", String.class, UUID.randomUUID().toString());
+        }
+        long timestamp = readLongMethod(request, "getTimestamp");
+        if (timestamp <= 0L) {
+            invokeIfPresent(request, "setTimestamp", long.class, System.currentTimeMillis());
+        }
+        String sessionToken = readStringMethod(request, "getSessionToken");
+        if ((sessionToken == null || sessionToken.isBlank())
+                && AppSession.getSessionToken() != null
+                && !AppSession.getSessionToken().isBlank()) {
+            invokeIfPresent(request, "setSessionToken", String.class, AppSession.getSessionToken());
+        }
+    }
+
+    private String readStringMethod(Message request, String methodName) {
+        try {
+            Method method = request.getClass().getMethod(methodName);
+            Object value = method.invoke(request);
+            return value instanceof String ? (String) value : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private long readLongMethod(Message request, String methodName) {
+        try {
+            Method method = request.getClass().getMethod(methodName);
+            Object value = method.invoke(request);
+            return value instanceof Number ? ((Number) value).longValue() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private void invokeIfPresent(Message request, String methodName, Class<?> parameterType, Object value) {
+        try {
+            Method method = request.getClass().getMethod(methodName, parameterType);
+            method.invoke(request, value);
+        } catch (Exception ignored) {
         }
     }
 }

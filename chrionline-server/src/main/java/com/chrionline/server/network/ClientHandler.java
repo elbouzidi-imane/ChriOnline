@@ -7,6 +7,9 @@ import com.chrionline.server.handler.AuthHandler;
 import com.chrionline.server.handler.CartHandler;
 import com.chrionline.server.handler.OrderHandler;
 import com.chrionline.server.handler.ProductHandler;
+import com.chrionline.server.security.ConnectionFloodProtectionService;
+import com.chrionline.server.security.RequestFirewallService;
+import com.chrionline.server.security.SessionSecurityService;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -23,6 +26,7 @@ public class ClientHandler implements Runnable {
     private final CartHandler cartHandler = new CartHandler();
     private final OrderHandler orderHandler = new OrderHandler();
     private final AdminHandler adminHandler = new AdminHandler();
+    private final SessionSecurityService sessionSecurityService = SessionSecurityService.getInstance();
     private int currentUserId;
     private boolean currentUserAdmin;
 
@@ -51,6 +55,7 @@ public class ClientHandler implements Runnable {
             System.err.println("Erreur avec " + clientIp + " : " + e.getMessage());
         } finally {
             ConnectedClientRegistry.unregisterUser(currentUserId);
+            ConnectionFloodProtectionService.getInstance().release(clientIp);
             try {
                 socket.close();
             } catch (Exception ignored) {
@@ -59,6 +64,15 @@ public class ClientHandler implements Runnable {
     }
 
     private Message route(Message req) {
+        String firewallError = RequestFirewallService.validate(req);
+        if (firewallError != null) {
+            return Message.error(firewallError);
+        }
+        String sessionError = validateSession(req);
+        if (sessionError != null) {
+            return Message.error(sessionError);
+        }
+
         return switch (req.getType()) {
             case Protocol.LOGIN,
                  Protocol.GET_LOGIN_CAPTCHA,
@@ -131,6 +145,97 @@ public class ClientHandler implements Runnable {
 
             default -> Message.error("Type inconnu : " + req.getType());
         };
+    }
+
+    private String validateSession(Message request) {
+        if (request == null || isPublicRequest(request.getType())) {
+            return null;
+        }
+        Integer payloadUserId = extractPayloadUserId(request);
+        if ((request.getSessionToken() == null || request.getSessionToken().isBlank())
+                && currentUserId > 0
+                && payloadUserId != null
+                && payloadUserId == currentUserId) {
+            if (request.getType() != null && request.getType().startsWith("ADMIN") && !currentUserAdmin) {
+                return "Acces refuse : session administrateur requise";
+            }
+            return null;
+        }
+        SessionSecurityService.SessionValidationResult validation = sessionSecurityService.validate(
+                request.getSessionToken(),
+                socket.getInetAddress().getHostAddress()
+        );
+        if (!validation.valid()) {
+            return validation.message();
+        }
+        currentUserId = validation.userId();
+        currentUserAdmin = validation.admin();
+
+        if (payloadUserId != null && payloadUserId != currentUserId) {
+            return "Session invalide : utilisateur different de la requete";
+        }
+        if (request.getType() != null && request.getType().startsWith("ADMIN") && !currentUserAdmin) {
+            return "Acces refuse : session administrateur requise";
+        }
+        return null;
+    }
+
+    private boolean isPublicRequest(String type) {
+        return Protocol.LOGIN.equals(type)
+                || Protocol.GET_LOGIN_CAPTCHA.equals(type)
+                || Protocol.VERIFY_LOGIN_OTP.equals(type)
+                || Protocol.RESEND_LOGIN_OTP.equals(type)
+                || Protocol.REGISTER.equals(type)
+                || Protocol.REGISTER_UDP_PORT.equals(type)
+                || Protocol.LOGOUT.equals(type)
+                || Protocol.VERIFY_EMAIL.equals(type)
+                || Protocol.RESEND_OTP.equals(type)
+                || Protocol.FORGOT_PASSWORD.equals(type)
+                || Protocol.VERIFY_RESET_OTP.equals(type)
+                || Protocol.RESET_PASSWORD.equals(type)
+                || Protocol.GET_PRODUCTS.equals(type)
+                || Protocol.GET_PRODUCT.equals(type)
+                || Protocol.GET_CATEGORIES.equals(type)
+                || Protocol.GET_PRODUCTS_BY_CATEGORIE.equals(type)
+                || Protocol.GET_PRODUCT_REVIEWS.equals(type);
+    }
+
+    private Integer extractPayloadUserId(Message request) {
+        if (request == null || request.getPayload() == null || request.getPayload().isBlank()) {
+            return null;
+        }
+        return switch (request.getType()) {
+            case Protocol.GET_CART,
+                 Protocol.CLEAR_CART,
+                 Protocol.GET_ORDERS,
+                 Protocol.UPDATE_PROFILE,
+                 Protocol.UPDATE_NOTIFICATION_PREFERENCE,
+                 Protocol.DEACTIVATE_ACCOUNT,
+                 Protocol.DELETE_ACCOUNT,
+                 Protocol.GET_NOTIFICATIONS,
+                 Protocol.ADD_TO_CART,
+                 Protocol.REMOVE_FROM_CART,
+                 Protocol.UPDATE_CART,
+                 Protocol.PLACE_ORDER,
+                 Protocol.CANCEL_ORDER,
+                 Protocol.APPLY_PROMO,
+                 Protocol.ADD_PRODUCT_REVIEW,
+                 Protocol.PAY,
+                 Protocol.MARK_NOTIFICATION_READ -> parseFirstInt(request.getPayload());
+            default -> null;
+        };
+    }
+
+    private Integer parseFirstInt(String payload) {
+        try {
+            String[] parts = payload.split("\\|", -1);
+            if (parts.length == 0 || parts[0].isBlank()) {
+                return null;
+            }
+            return Integer.parseInt(parts[0].trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void updateConnectionRegistry(Message request, Message response, String clientIp) {

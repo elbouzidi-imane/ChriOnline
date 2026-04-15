@@ -1,8 +1,10 @@
 package com.chrionline.client.ui.views;
 
 import com.chrionline.client.ui.NavigationManager;
+import com.chrionline.client.util.UIUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -13,6 +15,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Rectangle;
+
+import java.util.function.Supplier;
 
 public class HomeView extends ScrollPane {
     public HomeView() {
@@ -30,11 +34,11 @@ public class HomeView extends ScrollPane {
         logo.setStyle("-fx-font-size: 38px; -fx-font-weight: bold; -fx-text-fill: #15372f;");
 
         Button categoriesButton = ViewFactory.createSecondaryButton("Catalogue");
-        categoriesButton.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
+        categoriesButton.setOnAction(event -> safeNavigate(ProductListView::new));
         Button loginButton = ViewFactory.createSecondaryButton("Connexion");
-        loginButton.setOnAction(event -> NavigationManager.navigateTo(new LoginView()));
+        loginButton.setOnAction(event -> safeNavigate(LoginView::new));
         Button registerButton = ViewFactory.createPrimaryButton("Inscription");
-        registerButton.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
+        registerButton.setOnAction(event -> safeNavigate(RegisterView::new));
 
         HBox topBar = ViewFactory.createTopBar(logo, categoriesButton, loginButton, registerButton);
 
@@ -59,9 +63,9 @@ public class HomeView extends ScrollPane {
 
         HBox ctaRow = new HBox(12);
         Button shopNowButton = ViewFactory.createPrimaryButton("Explorer la collection");
-        shopNowButton.setOnAction(event -> NavigationManager.navigateTo(new ProductListView()));
+        shopNowButton.setOnAction(event -> safeNavigate(ProductListView::new));
         Button accountButton = ViewFactory.createSecondaryButton("Creer mon espace");
-        accountButton.setOnAction(event -> NavigationManager.navigateTo(new RegisterView()));
+        accountButton.setOnAction(event -> safeNavigate(RegisterView::new));
         ctaRow.getChildren().addAll(shopNowButton, accountButton);
 
         HBox metrics = new HBox(14,
@@ -90,6 +94,15 @@ public class HomeView extends ScrollPane {
                 createFeatureCard("Parcours plus fluide", "Les ecrans de connexion et d'inscription prennent une direction visuelle plus forte et plus coherente."));
 
         root.getChildren().addAll(topBar, heroRow, strips, focusTitle, cards);
+    }
+
+    private void safeNavigate(Supplier<Parent> viewSupplier) {
+        try {
+            NavigationManager.navigateTo(viewSupplier.get());
+        } catch (Throwable error) {
+            UIUtils.showError("Navigation impossible : " + error.getClass().getSimpleName()
+                    + (error.getMessage() == null || error.getMessage().isBlank() ? "" : " - " + error.getMessage()));
+        }
     }
 
     private StackPane buildHeroPanel() {

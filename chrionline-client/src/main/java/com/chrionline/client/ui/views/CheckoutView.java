@@ -192,12 +192,15 @@ public class CheckoutView extends ScrollPane {
                 + "-fx-background-radius: 16; -fx-padding: 13 18 13 18;");
         confirmButton.setMaxWidth(Double.MAX_VALUE);
         confirmButton.setOnAction(event -> {
+            confirmButton.setDisable(true);
             if (addressField.getText().isBlank()) {
                 UIUtils.showError("Adresse livraison obligatoire.");
+                confirmButton.setDisable(false);
                 return;
             }
             if (paymentBox.getValue() == null || deliveryBox.getValue() == null) {
                 UIUtils.showError("Selectionnez le mode de paiement et de livraison.");
+                confirmButton.setDisable(false);
                 return;
             }
             try {
@@ -208,6 +211,7 @@ public class CheckoutView extends ScrollPane {
                 }
             } catch (IllegalArgumentException e) {
                 UIUtils.showError(e.getMessage());
+                confirmButton.setDisable(false);
                 return;
             }
 
@@ -228,10 +232,11 @@ public class CheckoutView extends ScrollPane {
                 NavigationManager.navigateTo(new ProductListView());
             } catch (Exception e) {
                 UIUtils.showError(e.getMessage());
+                confirmButton.setDisable(false);
             }
         });
 
-        VBox formCard = new VBox(12,
+        VBox formFields = new VBox(12,
                 new Label("Adresse de livraison"), addressField,
                 new Separator(),
                 new Label("Code promo"),
@@ -243,11 +248,20 @@ public class CheckoutView extends ScrollPane {
                 paymentDetailsBox,
                 new Separator(),
                 new Label("Mode de livraison"), deliveryBox,
-                confirmButton
+                createInfoLabel("Descendez ici si necessaire : le bouton de confirmation reste visible en bas.")
         );
+        ScrollPane formScroll = new ScrollPane(formFields);
+        formScroll.setFitToWidth(true);
+        formScroll.setHbarPolicy(ScrollBarPolicy.NEVER);
+        formScroll.setVbarPolicy(ScrollBarPolicy.AS_NEEDED);
+        formScroll.setPrefViewportHeight(430);
+        formScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+
+        VBox formCard = new VBox(12, formScroll, confirmButton);
         formCard.setPadding(new Insets(18));
         formCard.setPrefWidth(340);
         formCard.setStyle(ViewFactory.cardStyle());
+        VBox.setVgrow(formScroll, Priority.ALWAYS);
 
         try {
             CartDTO cart = cartService.getCart();

@@ -14,6 +14,7 @@ public class UserDTO {
     private Date dateInscription;
     private Date dateNaissance;
     private boolean notificationsActivees;
+    private String sessionToken;
 
     public int getId() {
         return id;
@@ -97,6 +98,14 @@ public class UserDTO {
 
     public void setNotificationsActivees(boolean notificationsActivees) {
         this.notificationsActivees = notificationsActivees;
+    }
+
+    public String getSessionToken() {
+        return sessionToken;
+    }
+
+    public void setSessionToken(String sessionToken) {
+        this.sessionToken = sessionToken;
     }
 
     public boolean isAdmin() {

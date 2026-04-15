@@ -1,5 +1,6 @@
 package com.chrionline.client.network;
 
+import com.chrionline.client.security.UdpFloodProtectionService;
 import com.chrionline.client.util.UIUtils;
 import javafx.application.Platform;
 
@@ -9,6 +10,7 @@ import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 
 public class UDPListener implements Runnable {
+    private static final int MAX_PACKET_SIZE = 512;
     private volatile boolean running = true;
     private final DatagramSocket socket;
     private static volatile int boundPort;
@@ -26,6 +28,16 @@ public class UDPListener implements Runnable {
             while (running) {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
+                if (packet.getLength() > MAX_PACKET_SIZE) {
+                    System.err.println("Paquet UDP ignore : taille excessive depuis "
+                            + packet.getAddress().getHostAddress());
+                    continue;
+                }
+                if (!UdpFloodProtectionService.getInstance().allowPacket(packet.getAddress().getHostAddress())) {
+                    System.err.println("Paquet UDP ignore : debit trop eleve depuis "
+                            + packet.getAddress().getHostAddress());
+                    continue;
+                }
                 String message = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
                 Platform.runLater(() -> UIUtils.showInfo(message));
             }
