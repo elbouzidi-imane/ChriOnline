@@ -6,6 +6,7 @@ import com.chrionline.client.model.UserDTO;
 public final class AppSession {
     private static UserDTO currentUser;
     private static CartDTO currentCart;
+    private static String sessionToken;
 
     private AppSession() {
     }
@@ -16,6 +17,14 @@ public final class AppSession {
 
     public static void setCurrentUser(UserDTO currentUser) {
         AppSession.currentUser = currentUser;
+    }
+
+    public static String getSessionToken() {
+        return sessionToken;
+    }
+
+    public static void setSessionToken(String sessionToken) {
+        AppSession.sessionToken = sessionToken;
     }
 
     public static CartDTO getCurrentCart() {
@@ -33,5 +42,6 @@ public final class AppSession {
     public static void clear() {
         currentUser = null;
         currentCart = null;
+        sessionToken = null;
     }
 }

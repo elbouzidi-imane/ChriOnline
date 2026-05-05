@@ -1,16 +1,22 @@
 package com.chrionline.client.network;
 
+import com.chrionline.client.security.UdpFloodProtectionService;
 import com.chrionline.client.util.UIUtils;
+import com.chrionline.common.UdpNotificationSecurity;
 import javafx.application.Platform;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class UDPListener implements Runnable {
     private volatile boolean running = true;
     private final DatagramSocket socket;
+    private final UdpFloodProtectionService floodProtection = new UdpFloodProtectionService();
+    private final Set<String> seenNonces = ConcurrentHashMap.newKeySet();
     private static volatile int boundPort;
 
     public UDPListener() throws SocketException {
@@ -26,8 +32,24 @@ public class UDPListener implements Runnable {
             while (running) {
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                 socket.receive(packet);
-                String message = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
-                Platform.runLater(() -> UIUtils.showInfo(message));
+                String sourceIp = packet.getAddress().getHostAddress();
+                if (!floodProtection.allow(sourceIp)) {
+                    System.err.println("UDP packet rejete par rate limit ip=" + sourceIp);
+                    continue;
+                }
+                String packetPayload = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+                UdpNotificationSecurity.VerificationResult verification =
+                        UdpNotificationSecurity.verify(packetPayload);
+                if (!verification.isAccepted()) {
+                    System.err.println("UDP packet rejete par signature : ip=" + sourceIp
+                            + ", raison=" + verification.getReason());
+                    continue;
+                }
+                if (!seenNonces.add(verification.getNonce())) {
+                    System.err.println("UDP packet rejete par nonce deja vu : ip=" + sourceIp);
+                    continue;
+                }
+                Platform.runLater(() -> UIUtils.showInfo(verification.getMessage()));
             }
         } catch (SocketException e) {
             if (running) {
