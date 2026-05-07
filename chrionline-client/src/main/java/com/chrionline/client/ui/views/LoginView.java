@@ -1,6 +1,7 @@
 package com.chrionline.client.ui.views;
 
 import com.chrionline.client.model.NotificationDTO;
+import com.chrionline.client.model.AdminChallengeDTO;
 import com.chrionline.client.model.LoginCaptchaDTO;
 import com.chrionline.client.model.LoginResponseDTO;
 import com.chrionline.client.model.UserDTO;
@@ -20,6 +21,7 @@ import javafx.scene.control.DialogPane;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -187,8 +189,11 @@ public class LoginView extends HBox {
         Hyperlink homeLink = createLink("Retour a l'accueil", new HomeView());
         Hyperlink forgotLink = new Hyperlink("Mot de passe oublie ?");
         forgotLink.setOnAction(event -> showForgotPasswordFlow());
+        Hyperlink adminRsaLink = new Hyperlink("Connexion admin RSA");
+        adminRsaLink.setStyle("-fx-text-fill: #1d5f52; -fx-font-size: 13px;");
+        adminRsaLink.setOnAction(event -> showAdminRsaLoginFlow());
 
-        formCard.getChildren().addAll(title, subtitle, emailField, passwordField, loginAttemptLabel, loginButton, registerLink, catalogLink, forgotLink, homeLink);
+        formCard.getChildren().addAll(title, subtitle, emailField, passwordField, loginAttemptLabel, loginButton, adminRsaLink, registerLink, catalogLink, forgotLink, homeLink);
         form.getChildren().add(formCard);
         getChildren().addAll(marketing, form);
     }
@@ -300,6 +305,57 @@ public class LoginView extends HBox {
         Optional<ButtonType> secondStep = otpDialog.showAndWait();
         if (secondStep.isEmpty() || secondStep.get().getButtonData() == ButtonBar.ButtonData.CANCEL_CLOSE) {
             return;
+        }
+    }
+
+    private void showAdminRsaLoginFlow() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Connexion admin RSA");
+        DialogPane pane = dialog.getDialogPane();
+        pane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        pane.setStyle("-fx-background-color: #fffaf5;");
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email admin");
+        emailField.setStyle(ViewFactory.inputStyle());
+
+        TextArea privateKeyArea = new TextArea();
+        privateKeyArea.setPromptText("Cle privee RSA admin en Base64");
+        privateKeyArea.setWrapText(true);
+        privateKeyArea.setPrefRowCount(6);
+        privateKeyArea.setStyle(ViewFactory.inputStyle());
+
+        pane.setContent(new VBox(12,
+                new Label("Saisissez l'email admin puis la cle privee RSA locale."),
+                emailField,
+                privateKeyArea
+        ));
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return;
+        }
+
+        try {
+            AdminChallengeDTO challenge = authService.requestAdminChallenge(emailField.getText().trim());
+            System.out.println("Challenge recu du serveur : " + challenge.getChallenge());
+            UserDTO user = authService.verifyAdminChallenge(
+                    challenge.getChallengeId(),
+                    challenge.getChallenge(),
+                    privateKeyArea.getText().trim()
+            );
+            if (user == null || !user.isAdmin()) {
+                UIUtils.showError("Acces admin refuse.");
+                return;
+            }
+            System.out.println("Challenge signe avec cle privee");
+            System.out.println("Signature envoyee au serveur");
+            System.out.println("Acces admin accorde !");
+            AppSession.setCurrentUser(user);
+            showPendingNotifications();
+            NavigationManager.navigateTo(new AdminView());
+        } catch (Exception e) {
+            UIUtils.showError(e.getMessage());
         }
     }
 

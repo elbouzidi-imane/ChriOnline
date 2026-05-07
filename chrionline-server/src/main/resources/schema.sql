@@ -17,7 +17,8 @@ CREATE TABLE utilisateur (
                                  CHECK (statut IN ('ACTIF', 'SUSPENDU')),
                              date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                              date_naissance   DATE,
-                             notifications_activees BOOLEAN NOT NULL DEFAULT FALSE
+                             notifications_activees BOOLEAN NOT NULL DEFAULT FALSE,
+                             cle_publique_rsa TEXT
 );
 
 CREATE TABLE notification (

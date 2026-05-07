@@ -18,6 +18,7 @@ public class User implements Serializable {
     private Date dateInscription;
     private Date dateNaissance;
     private boolean notificationsActivees;
+    private String clePubliqueRsa;
 
     public User() {}
 
@@ -45,6 +46,7 @@ public class User implements Serializable {
     public Date getDateInscription() { return dateInscription; }
     public Date getDateNaissance() { return dateNaissance; }
     public boolean isNotificationsActivees() { return notificationsActivees; }
+    public String getClePubliqueRsa() { return clePubliqueRsa; }
 
     public void setId(int id) { this.id = id; }
     public void setNom(String nom) { this.nom = nom; }
@@ -60,6 +62,7 @@ public class User implements Serializable {
     public void setNotificationsActivees(boolean notificationsActivees) {
         this.notificationsActivees = notificationsActivees;
     }
+    public void setClePubliqueRsa(String clePubliqueRsa) { this.clePubliqueRsa = clePubliqueRsa; }
 
     public boolean isAdmin() { return "ADMIN".equals(role); }
     public boolean isActif() { return "ACTIF".equals(statut); }

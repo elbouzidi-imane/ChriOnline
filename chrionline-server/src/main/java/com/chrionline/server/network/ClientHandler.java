@@ -1,5 +1,7 @@
 package com.chrionline.server.network;
 
+import com.chrionline.common.CryptoAES;
+import com.chrionline.common.CryptoRSA;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.handler.AdminHandler;
@@ -14,6 +16,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -21,6 +24,7 @@ import java.net.Socket;
 public class ClientHandler implements Runnable {
 
     private final Socket socket;
+    private final CryptoRSA cryptoRSA;
     private final AuthHandler authHandler = new AuthHandler();
     private final ProductHandler productHandler = new ProductHandler();
     private final CartHandler cartHandler = new CartHandler();
@@ -29,11 +33,13 @@ public class ClientHandler implements Runnable {
     private final RequestReplayGuardService replayGuard = RequestReplayGuardService.getInstance();
     private final SessionSecurityService sessionSecurity = SessionSecurityService.getInstance();
     private final SensitiveActionOtpService sensitiveOtp = SensitiveActionOtpService.getInstance();
+    private CryptoAES aes;
     private int currentUserId;
     private boolean currentUserAdmin;
 
-    public ClientHandler(Socket socket) {
+    public ClientHandler(Socket socket, CryptoRSA cryptoRSA) {
         this.socket = socket;
+        this.cryptoRSA = cryptoRSA;
     }
 
     @Override
@@ -42,12 +48,14 @@ public class ClientHandler implements Runnable {
 
         try (ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
              ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+            initializeSecureChannel(out, in);
             socket.setSoTimeout(0);
             Message request;
-            while ((request = (Message) in.readObject()) != null) {
+            while ((request = readMessage(in)) != null) {
                 System.out.println("[" + clientIp + "] -> " + request.getType());
                 Message response = verifyAndRoute(request);
                 updateConnectionRegistry(request, response, clientIp);
+                encryptPayload(response);
                 out.writeObject(response);
                 out.flush();
                 System.out.println("[" + clientIp + "] <- " + response.getStatus());
@@ -62,6 +70,52 @@ public class ClientHandler implements Runnable {
                 socket.close();
             } catch (Exception ignored) {
             }
+        }
+    }
+
+    private void initializeSecureChannel(ObjectOutputStream out, ObjectInputStream in) throws Exception {
+        out.writeObject(cryptoRSA.getPublicKey().getEncoded());
+        out.flush();
+
+        Object encryptedKeyObject = in.readObject();
+        if (!(encryptedKeyObject instanceof byte[] encryptedKey)) {
+            throw new IOException("Cle AES client invalide");
+        }
+
+        byte[] aesKeyBytes = cryptoRSA.dechiffrer(encryptedKey);
+        CryptoAES negotiatedAes = new CryptoAES();
+        negotiatedAes.setCleDepuisBytes(aesKeyBytes);
+        aes = negotiatedAes;
+        System.out.println("Cle AES recue et dechiffree avec succes");
+    }
+
+    private Message readMessage(ObjectInputStream in) throws Exception {
+        Object object = in.readObject();
+        if (object == null) {
+            return null;
+        }
+        if (!(object instanceof Message message)) {
+            throw new IOException("Requete client invalide");
+        }
+        decryptPayload(message);
+        return message;
+    }
+
+    private void encryptPayload(Message message) throws Exception {
+        ensureSecureChannel();
+        if (message != null) {
+            message.setPayload(aes.chiffrerBase64(message.getPayload()));
+        }
+    }
+
+    private void decryptPayload(Message message) throws Exception {
+        ensureSecureChannel();
+        message.setPayload(aes.dechiffrerBase64(message.getPayload()));
+    }
+
+    private void ensureSecureChannel() {
+        if (aes == null) {
+            throw new IllegalStateException("Canal securise non initialise");
         }
     }
 
@@ -107,6 +161,8 @@ public class ClientHandler implements Runnable {
                  Protocol.GET_LOGIN_CAPTCHA,
                  Protocol.VERIFY_LOGIN_OTP,
                  Protocol.RESEND_LOGIN_OTP,
+                 Protocol.ADMIN_CHALLENGE_REQUEST,
+                 Protocol.ADMIN_CHALLENGE_VERIFY,
                  Protocol.REGISTER,
                  Protocol.VERIFY_EMAIL,
                  Protocol.RESEND_OTP,
@@ -165,7 +221,9 @@ public class ClientHandler implements Runnable {
                  Protocol.GET_NOTIFICATIONS,
                  Protocol.MARK_NOTIFICATION_READ,
                  Protocol.DEACTIVATE_ACCOUNT,
-                 Protocol.DELETE_ACCOUNT -> authHandler.handle(req, socket.getInetAddress().getHostAddress());
+                 Protocol.DELETE_ACCOUNT,
+                 Protocol.ADMIN_CHALLENGE_REQUEST,
+                 Protocol.ADMIN_CHALLENGE_VERIFY -> authHandler.handle(req, socket.getInetAddress().getHostAddress());
 
             case Protocol.GET_PRODUCTS,
                  Protocol.GET_PRODUCT,
@@ -267,6 +325,29 @@ public class ClientHandler implements Runnable {
                 }
             } catch (Exception e) {
                 System.err.println("ClientHandler.updateConnectionRegistry otp : " + e.getMessage());
+            }
+            return;
+        }
+        if (Protocol.ADMIN_CHALLENGE_VERIFY.equals(request.getType())) {
+            try {
+                JsonObject user = JsonParser.parseString(response.getPayload()).getAsJsonObject();
+                if (user != null && user.has("id")) {
+                    int newUserId = user.get("id").getAsInt();
+                    if (currentUserId > 0 && currentUserId != newUserId) {
+                        ConnectedClientRegistry.unregisterUser(currentUserId);
+                    }
+                    currentUserId = newUserId;
+                    currentUserAdmin = true;
+                    com.chrionline.server.model.User sessionUser = new com.chrionline.server.model.User();
+                    sessionUser.setId(currentUserId);
+                    sessionUser.setEmail(user.has("email") && !user.get("email").isJsonNull()
+                            ? user.get("email").getAsString()
+                            : "");
+                    sessionUser.setRole("ADMIN");
+                    response.setSessionToken(sessionSecurity.create(sessionUser).token());
+                }
+            } catch (Exception e) {
+                System.err.println("ClientHandler.updateConnectionRegistry admin rsa : " + e.getMessage());
             }
             return;
         }

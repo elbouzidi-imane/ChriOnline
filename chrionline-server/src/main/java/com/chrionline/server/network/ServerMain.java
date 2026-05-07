@@ -1,6 +1,7 @@
 package com.chrionline.server.network;
 
 import com.chrionline.common.AppConstants;
+import com.chrionline.common.CryptoRSA;
 
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,6 +15,14 @@ public class ServerMain {
     public static void main(String[] args) {
         System.out.println("=== ChriOnline Server ===");
         System.out.println("Demarrage sur le port " + AppConstants.PORT_TCP + "...");
+        CryptoRSA cryptoRSA = new CryptoRSA();
+        try {
+            cryptoRSA.genererCles();
+            System.out.println("Cles RSA generees avec succes");
+        } catch (Exception e) {
+            System.err.println("Generation RSA impossible : " + e.getMessage());
+            return;
+        }
 
         ThreadPoolExecutor clientExecutor = new ThreadPoolExecutor(
                 AppConstants.SERVER_WORKER_THREADS,
@@ -45,7 +54,7 @@ public class ServerMain {
                 System.out.println("Nouveau client connecte : "
                         + clientSocket.getInetAddress().getHostAddress());
                 try {
-                    clientExecutor.execute(new ClientHandler(clientSocket));
+                    clientExecutor.execute(new ClientHandler(clientSocket, cryptoRSA));
                 } catch (RejectedExecutionException e) {
                     System.err.println("Connexion rejetee : serveur sature pour "
                             + clientSocket.getInetAddress().getHostAddress());

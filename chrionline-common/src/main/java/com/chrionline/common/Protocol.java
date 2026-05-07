@@ -71,6 +71,8 @@ public class Protocol {
     public static final String ADMIN_TOGGLE_PROMO = "ADMIN_TOGGLE_PROMO";
     public static final String ADMIN_ADD_CATEGORY = "ADMIN_ADD_CATEGORY";
     public static final String ADMIN_GET_CATEGORIES = "ADMIN_GET_CATEGORIES";
+    public static final String ADMIN_CHALLENGE_REQUEST = "ADMIN_CHALLENGE_REQUEST";
+    public static final String ADMIN_CHALLENGE_VERIFY = "ADMIN_CHALLENGE_VERIFY";
 
     public static final String OK = "OK";
     public static final String ERROR = "ERROR";

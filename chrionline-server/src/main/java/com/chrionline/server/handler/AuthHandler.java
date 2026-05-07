@@ -3,6 +3,7 @@ package com.chrionline.server.handler;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
 import com.chrionline.server.model.User;
+import com.chrionline.server.security.AdminChallengeService;
 import com.chrionline.server.security.PasswordPolicy;
 import com.chrionline.server.service.LoginCaptchaService;
 import com.chrionline.server.service.LoginAttemptService;
@@ -24,6 +25,7 @@ public class AuthHandler {
     private final LoginCaptchaService loginCaptchaService = LoginCaptchaService.getInstance();
     private final LoginAttemptService loginAttemptService = LoginAttemptService.getInstance();
     private final LoginTwoFactorService loginTwoFactorService = LoginTwoFactorService.getInstance();
+    private final AdminChallengeService adminChallengeService = AdminChallengeService.getInstance();
     private final Gson gson = new Gson();
 
     public Message handle(Message request, String clientIp) {
@@ -39,6 +41,8 @@ public class AuthHandler {
             case Protocol.FORGOT_PASSWORD -> handleForgotPassword(request);
             case Protocol.VERIFY_RESET_OTP -> handleVerifyResetOtp(request);
             case Protocol.RESET_PASSWORD -> handleResetPassword(request);
+            case Protocol.ADMIN_CHALLENGE_REQUEST -> handleAdminChallengeRequest(request);
+            case Protocol.ADMIN_CHALLENGE_VERIFY -> handleAdminChallengeVerify(request);
             case Protocol.UPDATE_PROFILE -> handleUpdateProfile(request);
             case Protocol.UPDATE_NOTIFICATION_PREFERENCE -> handleUpdateNotificationPreference(request);
             case Protocol.REGISTER_UDP_PORT -> Message.ok(Protocol.REGISTER_UDP_PORT, "Port UDP enregistre");
@@ -129,6 +133,32 @@ public class AuthHandler {
             return Message.error("Impossible de renvoyer le code OTP.");
         }
         return Message.ok(Protocol.RESEND_LOGIN_OTP, "Un nouveau code OTP a ete envoye par email.");
+    }
+
+    private Message handleAdminChallengeRequest(Message req) {
+        String adminEmail = req.getPayload() == null ? "" : req.getPayload().trim().toLowerCase();
+        if (adminEmail.isEmpty()) {
+            return Message.error("Email admin obligatoire.");
+        }
+        AdminChallengeService.ChallengeResponse challenge = adminChallengeService.createChallenge(adminEmail);
+        if (!challenge.accepted()) {
+            return Message.error(challenge.reason());
+        }
+        JsonObject payload = new JsonObject();
+        payload.addProperty("challengeId", challenge.challengeId());
+        payload.addProperty("challenge", challenge.challenge());
+        return Message.ok(Protocol.ADMIN_CHALLENGE_REQUEST, payload.toString());
+    }
+
+    private Message handleAdminChallengeVerify(Message req) {
+        JsonObject json = JsonParser.parseString(req.getPayload()).getAsJsonObject();
+        String challengeId = getJsonString(json, "challengeId");
+        String signature = getJsonString(json, "signature");
+        AdminChallengeService.VerificationResult result = adminChallengeService.verify(challengeId, signature);
+        if (!result.accepted()) {
+            return Message.error(result.reason());
+        }
+        return Message.ok(Protocol.ADMIN_CHALLENGE_VERIFY, gson.toJson(result.admin()));
     }
 
     private Message handleRegister(Message req) {

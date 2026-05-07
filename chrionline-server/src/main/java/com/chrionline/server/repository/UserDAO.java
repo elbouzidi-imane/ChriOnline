@@ -2,6 +2,7 @@ package com.chrionline.server.repository;
 
 import com.chrionline.server.db.DatabaseManager;
 import com.chrionline.server.model.User;
+import com.chrionline.server.security.DatabaseCryptoService;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -11,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UserDAO {
+
+    private final DatabaseCryptoService databaseCrypto = DatabaseCryptoService.getInstance();
 
     private Connection getConnection() throws Exception {
         return DatabaseManager.getInstance().getConnection();
@@ -25,6 +28,33 @@ public class UserDAO {
             if (rs.next()) return mapRow(rs);
         } catch (Exception e) {
             System.err.println("UserDAO.findByEmail : " + e.getMessage());
+        }
+        return null;
+    }
+
+    public User findAdminByEmailWithPublicKey(String email) {
+        String sql = """
+            SELECT id, nom, prenom, email, role, statut, cle_publique_rsa
+            FROM utilisateur
+            WHERE email = ? AND role = 'ADMIN' AND statut = 'ACTIF'
+            """;
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, email);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                User user = new User();
+                user.setId(rs.getInt("id"));
+                user.setNom(rs.getString("nom"));
+                user.setPrenom(rs.getString("prenom"));
+                user.setEmail(rs.getString("email"));
+                user.setRole(rs.getString("role"));
+                user.setStatut(rs.getString("statut"));
+                user.setClePubliqueRsa(rs.getString("cle_publique_rsa"));
+                return user;
+            }
+        } catch (Exception e) {
+            System.err.println("UserDAO.findAdminByEmailWithPublicKey : " + e.getMessage());
         }
         return null;
     }
@@ -56,7 +86,7 @@ public class UserDAO {
             ps.setString(3, user.getEmail());
             ps.setString(4, user.getMotDePasse());
             ps.setString(5, user.getTelephone());
-            ps.setString(6, user.getAdresse());
+            ps.setString(6, databaseCrypto.encryptNullable(user.getAdresse()));
             ps.setString(7, user.getRole());
             ps.setString(8, user.getStatut());
             ps.setBoolean(9, user.isNotificationsActivees());
@@ -97,7 +127,7 @@ public class UserDAO {
             ps.setString(1, user.getNom());
             ps.setString(2, user.getPrenom());
             ps.setString(3, user.getTelephone());
-            ps.setString(4, user.getAdresse());
+            ps.setString(4, databaseCrypto.encryptNullable(user.getAdresse()));
             ps.setInt(5, user.getId());
             return ps.executeUpdate() > 0;
         } catch (Exception e) {
@@ -115,6 +145,19 @@ public class UserDAO {
             return ps.executeUpdate() > 0;
         } catch (Exception e) {
             System.err.println("UserDAO.updatePassword : " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean updateAdminPublicKey(int id, String publicKeyBase64) {
+        String sql = "UPDATE utilisateur SET cle_publique_rsa = ? WHERE id = ? AND role = 'ADMIN'";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, publicKeyBase64);
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            System.err.println("UserDAO.updateAdminPublicKey : " + e.getMessage());
             return false;
         }
     }
@@ -206,12 +249,17 @@ public class UserDAO {
         u.setEmail(rs.getString("email"));
         u.setMotDePasse(rs.getString("mot_de_passe"));
         u.setTelephone(rs.getString("telephone"));
-        u.setAdresse(rs.getString("adresse"));
+        u.setAdresse(databaseCrypto.decryptNullable(rs.getString("adresse")));
         u.setRole(rs.getString("role"));
         u.setStatut(rs.getString("statut"));
         u.setDateInscription(rs.getDate("date_inscription"));
         u.setDateNaissance(rs.getDate("date_naissance"));
         u.setNotificationsActivees(rs.getBoolean("notifications_activees"));
+        try {
+            u.setClePubliqueRsa(rs.getString("cle_publique_rsa"));
+        } catch (SQLException ignored) {
+            // Anciennes bases sans colonne cle_publique_rsa restent compatibles.
+        }
         return u;
     }
 }

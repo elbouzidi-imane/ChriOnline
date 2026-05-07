@@ -1,5 +1,6 @@
 package com.chrionline.client.service;
 
+import com.chrionline.client.model.AdminChallengeDTO;
 import com.chrionline.client.model.LoginCaptchaDTO;
 import com.chrionline.client.model.LoginResponseDTO;
 import com.chrionline.client.model.UserDTO;
@@ -8,6 +9,7 @@ import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.util.JsonUtils;
 import com.chrionline.common.Message;
 import com.chrionline.common.Protocol;
+import com.chrionline.common.RsaSignatureUtils;
 import com.google.gson.JsonObject;
 
 public class AuthService {
@@ -45,6 +47,24 @@ public class AuthService {
 
     public String resendLoginOtp(String pendingToken) throws Exception {
         return send(Protocol.RESEND_LOGIN_OTP, pendingToken).getPayload();
+    }
+
+    public AdminChallengeDTO requestAdminChallenge(String adminEmail) throws Exception {
+        Message response = send(Protocol.ADMIN_CHALLENGE_REQUEST, adminEmail);
+        return JsonUtils.GSON.fromJson(response.getPayload(), AdminChallengeDTO.class);
+    }
+
+    public UserDTO verifyAdminChallenge(String challengeId, String challenge, String privateKeyBase64) throws Exception {
+        String signatureBase64 = RsaSignatureUtils.signBase64(challenge, privateKeyBase64);
+        JsonObject payload = new JsonObject();
+        payload.addProperty("challengeId", challengeId);
+        payload.addProperty("signature", signatureBase64);
+        UserDTO user = JsonUtils.GSON.fromJson(send(Protocol.ADMIN_CHALLENGE_VERIFY, payload.toString()).getPayload(), UserDTO.class);
+        int udpPort = UDPListener.getBoundPort();
+        if (udpPort > 0) {
+            send(Protocol.REGISTER_UDP_PORT, String.valueOf(udpPort));
+        }
+        return user;
     }
 
     public String register(String nom, String prenom, String email, String mdp, String tel, String adresse, String dateNaissance) throws Exception {

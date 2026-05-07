@@ -2,6 +2,8 @@ package com.chrionline.client.network;
 
 import com.chrionline.client.session.AppSession;
 import com.chrionline.common.AppConstants;
+import com.chrionline.common.CryptoAES;
+import com.chrionline.common.CryptoRSA;
 import com.chrionline.common.Message;
 import com.chrionline.common.RequestSignature;
 import javafx.scene.control.TextInputDialog;
@@ -11,6 +13,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ConnectException;
 import java.net.Socket;
+import java.security.PublicKey;
 import java.util.Optional;
 
 public class TCPClient {
@@ -19,6 +22,7 @@ public class TCPClient {
     private Socket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
+    private CryptoAES aes;
 
     private TCPClient() {
     }
@@ -36,6 +40,7 @@ public class TCPClient {
             out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             in = new ObjectInputStream(socket.getInputStream());
+            initializeSecureChannel();
         } catch (ConnectException e) {
             closeQuietly();
             throw new ConnectException("Connexion refusee. Demarrez le serveur ChriOnline sur "
@@ -43,6 +48,9 @@ public class TCPClient {
         } catch (IOException e) {
             closeQuietly();
             throw e;
+        } catch (Exception e) {
+            closeQuietly();
+            throw new IOException("Initialisation du canal securise impossible", e);
         }
     }
 
@@ -66,14 +74,17 @@ public class TCPClient {
     }
 
     private Message sendSigned(Message request) throws Exception {
-        RequestSignature.sign(request);
+        Message wireRequest = new Message(request);
+        RequestSignature.sign(wireRequest);
+        encryptPayload(wireRequest);
         out.reset();
-        out.writeObject(request);
+        out.writeObject(wireRequest);
         out.flush();
         Object response = in.readObject();
         if (!(response instanceof Message message)) {
             throw new IOException("Reponse serveur invalide");
         }
+        decryptPayload(message);
         return message;
     }
 
@@ -103,6 +114,7 @@ public class TCPClient {
             socket = null;
             out = null;
             in = null;
+            aes = null;
         }
         if (error != null) {
             throw error;
@@ -136,6 +148,41 @@ public class TCPClient {
         dialog.setHeaderText("Code OTP requis");
         dialog.setContentText(message.replace("OTP_ACTION_REQUIRED:", "").trim() + "\nCode OTP :");
         return dialog.showAndWait();
+    }
+
+    private void initializeSecureChannel() throws Exception {
+        Object publicKeyObject = in.readObject();
+        if (!(publicKeyObject instanceof byte[] publicKeyBytes)) {
+            throw new IOException("Cle publique serveur invalide");
+        }
+
+        CryptoRSA rsa = new CryptoRSA();
+        PublicKey serverPublicKey = rsa.reconstruireClePublique(publicKeyBytes);
+
+        CryptoAES negotiatedAes = new CryptoAES();
+        negotiatedAes.genererCle();
+        byte[] encryptedAesKey = rsa.chiffrer(negotiatedAes.getCle().getEncoded(), serverPublicKey);
+
+        out.writeObject(encryptedAesKey);
+        out.flush();
+        aes = negotiatedAes;
+        System.out.println("Canal securise initialise : RSA + AES-GCM");
+    }
+
+    private void encryptPayload(Message message) throws Exception {
+        ensureSecureChannel();
+        message.setPayload(aes.chiffrerBase64(message.getPayload()));
+    }
+
+    private void decryptPayload(Message message) throws Exception {
+        ensureSecureChannel();
+        message.setPayload(aes.dechiffrerBase64(message.getPayload()));
+    }
+
+    private void ensureSecureChannel() {
+        if (aes == null) {
+            throw new IllegalStateException("Canal securise non initialise");
+        }
     }
 
     private void closeQuietly() {

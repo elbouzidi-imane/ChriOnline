@@ -36,6 +36,18 @@ public class Message implements Serializable {
         this.status  = Protocol.OK;
     }
 
+    public Message(Message source) {
+        this.type = source.type;
+        this.payload = source.payload;
+        this.status = source.status;
+        this.timestamp = source.timestamp;
+        this.nonce = source.nonce;
+        this.signature = source.signature;
+        this.requestId = source.requestId;
+        this.sessionToken = source.sessionToken;
+        this.sensitiveOtp = source.sensitiveOtp;
+    }
+
     // ── Factories statiques ───────────────────────────
 
     /** Crée une réponse OK avec données */

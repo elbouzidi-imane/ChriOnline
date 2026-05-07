@@ -3,12 +3,15 @@ package com.chrionline.server.repository;
 import com.chrionline.server.db.DatabaseManager;
 import com.chrionline.server.model.Order;
 import com.chrionline.server.model.OrderLine;
+import com.chrionline.server.security.DatabaseCryptoService;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class OrderDAO {
+
+    private final DatabaseCryptoService databaseCrypto = DatabaseCryptoService.getInstance();
 
     private Connection getConnection() throws Exception {
         return DatabaseManager.getInstance().getConnection();
@@ -27,7 +30,7 @@ public class OrderDAO {
             ps.setInt(2, order.getUtilisateurId());
             ps.setString(3, order.getStatut());
             ps.setDouble(4, order.getMontantTotal());
-            ps.setString(5, order.getAdresseLivraison());
+            ps.setString(5, databaseCrypto.encryptNullable(order.getAdresseLivraison()));
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 order.setId(rs.getInt("id"));
@@ -180,7 +183,7 @@ public class OrderDAO {
         o.setDateCommande(rs.getTimestamp("date_commande"));
         o.setStatut(rs.getString("statut"));
         o.setMontantTotal(rs.getDouble("montant_total"));
-        o.setAdresseLivraison(rs.getString("adresse_livraison"));
+        o.setAdresseLivraison(databaseCrypto.decryptNullable(rs.getString("adresse_livraison")));
         o.setMotifAnnulation(rs.getString("motif_annulation"));
         return o;
     }
