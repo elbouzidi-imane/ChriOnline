@@ -99,9 +99,15 @@ public class CheckoutView extends ScrollPane {
                     setGraphic(null);
                     return;
                 }
-                Label titleLabel = new Label(item.getProduit().getNom() + " x" + item.getQuantite());
+                String productName = item.getProduit() == null
+                        ? "Produit #" + item.getProduitId()
+                        : item.getProduit().getNom();
+                String sizeValue = item.getTaille() == null
+                        ? "Taille #" + item.getTailleId()
+                        : "Taille " + item.getTaille().getValeur();
+                Label titleLabel = new Label(productName + " x" + item.getQuantite());
                 titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #12372e;");
-                Label detailLabel = new Label("Taille " + item.getTaille().getValeur());
+                Label detailLabel = new Label(sizeValue);
                 detailLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #64748b;");
                 VBox left = new VBox(4, titleLabel, detailLabel);
 
@@ -212,6 +218,9 @@ public class CheckoutView extends ScrollPane {
             }
 
             try {
+                CartDTO cart = cartService.getCart();
+                double totalToPay = appliedPromo == null ? cart.getTotal() : appliedPromo.getFinalTotal();
+                orderService.pay(paymentBox.getValue(), totalToPay);
                 authService.updateNotificationPreference(
                         AppSession.getCurrentUser().getId(),
                         notificationsBox.isSelected()

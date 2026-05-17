@@ -16,14 +16,14 @@ public final class RsaSignatureUtils {
 
     private RsaSignatureUtils() {
     }
-
+//cote client
     public static byte[] sign(String challenge, PrivateKey privateKey) throws Exception {
         Signature signature = Signature.getInstance(SIGNATURE_ALGORITHM);
         signature.initSign(privateKey);
         signature.update(value(challenge).getBytes(StandardCharsets.UTF_8));
         return signature.sign();
     }
-
+//cote serveur
     public static boolean verify(String challenge, byte[] signatureBytes, PublicKey publicKey) throws Exception {
         Signature signature = Signature.getInstance(SIGNATURE_ALGORITHM);
         signature.initVerify(publicKey);

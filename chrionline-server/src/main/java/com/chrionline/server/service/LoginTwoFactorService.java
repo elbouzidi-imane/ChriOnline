@@ -29,6 +29,11 @@ public final class LoginTwoFactorService {
 
     public LoginChallenge initiate(User user) {
         purgeExpired();
+        //apres un mot de passe correct le serveur generer un OTP envoyer par email
+        //le serveur crre un prndingtokern
+        //il garde temporairement k'utilisateur en attente
+        //il envoie un OTP par email
+        //l'utilisateur n'est pas encore connecté completement
         String token = UUID.randomUUID().toString();
         PendingLogin pendingLogin = new PendingLogin(user, Instant.now().plus(OTP_TTL));
         pendingLogins.put(token, pendingLogin);

@@ -5,6 +5,7 @@ import com.chrionline.client.model.CancellationConfigDTO;
 import com.chrionline.client.model.CancellationResultDTO;
 import com.chrionline.client.model.ProductReviewDTO;
 import com.chrionline.client.model.PromoValidationResultDTO;
+import com.chrionline.client.network.PaymentTlsClient;
 import com.chrionline.client.network.TCPClient;
 import com.chrionline.client.session.AppSession;
 import com.chrionline.client.util.JsonUtils;
@@ -17,6 +18,7 @@ import java.util.List;
 
 public class OrderService {
     private final TCPClient tcp = TCPClient.getInstance();
+    private final PaymentTlsClient paymentTlsClient = new PaymentTlsClient();
 
     public String placeOrder(String adresse, String modePaiement, String modeLivraison, String promoCode) throws Exception {
         String payload = AppSession.getCurrentUser().getId() + "|" + adresse + "|" + modePaiement + "|" + modeLivraison
@@ -46,12 +48,32 @@ public class OrderService {
     }
 
     public String pay(String modePaiement, double montant) throws Exception {
+        validatePaymentWithTls(modePaiement, montant);
         String payload = AppSession.getCurrentUser().getId() + "|" + modePaiement + "|" + montant;
         Message response = tcp.send(new Message(Protocol.PAY, payload));
         if (response.isError()) {
             throw new IllegalStateException(response.getPayload());
         }
         return response.getPayload();
+    }
+
+    private void validatePaymentWithTls(String modePaiement, double montant) {
+        try {
+            PaymentTlsClient.PaymentTlsResult result = paymentTlsClient.validatePayment(
+                    AppSession.getCurrentUser().getId(),
+                    modePaiement,
+                    montant
+            );
+            if (!result.accepted()) {
+                throw new IllegalStateException(result.reason());
+            }
+            System.out.println("[TLS PAYMENT] Validation TLS acceptee : " + result.reference());
+        } catch (Exception e) {
+            if (PaymentTlsClient.isStrictMode()) {
+                throw new IllegalStateException("Paiement TLS refuse : " + e.getMessage(), e);
+            }
+            System.err.println("[TLS PAYMENT] Validation TLS ignoree (mode non strict) : " + e.getMessage());
+        }
     }
 
     public CancellationConfigDTO getCancellationConfig() throws Exception {

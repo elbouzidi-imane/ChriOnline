@@ -155,7 +155,7 @@ public class TCPClient {
         if (!(publicKeyObject instanceof byte[] publicKeyBytes)) {
             throw new IOException("Cle publique serveur invalide");
         }
-
+//cleint recoit cle publique RSA..
         CryptoRSA rsa = new CryptoRSA();
         PublicKey serverPublicKey = rsa.reconstruireClePublique(publicKeyBytes);
 
@@ -168,7 +168,7 @@ public class TCPClient {
         aes = negotiatedAes;
         System.out.println("Canal securise initialise : RSA + AES-GCM");
     }
-
+//Chiffrer les payloads avant envoi.
     private void encryptPayload(Message message) throws Exception {
         ensureSecureChannel();
         message.setPayload(aes.chiffrerBase64(message.getPayload()));

@@ -72,7 +72,7 @@ public class ClientHandler implements Runnable {
             }
         }
     }
-
+//le serveur envoie cle publique RSA
     private void initializeSecureChannel(ObjectOutputStream out, ObjectInputStream in) throws Exception {
         out.writeObject(cryptoRSA.getPublicKey().getEncoded());
         out.flush();
@@ -100,7 +100,7 @@ public class ClientHandler implements Runnable {
         decryptPayload(message);
         return message;
     }
-
+    //Chiffrer/déchiffrer les payloads des messages.
     private void encryptPayload(Message message) throws Exception {
         ensureSecureChannel();
         if (message != null) {

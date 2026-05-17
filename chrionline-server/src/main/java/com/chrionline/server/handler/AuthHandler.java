@@ -53,7 +53,7 @@ public class AuthHandler {
             default -> Message.error("Type non gere par AuthHandler");
         };
     }
-
+//2FA
     private Message handleLogin(Message req, String clientIp) {
         LoginRequest loginRequest = parseLoginRequest(req.getPayload());
         String email = loginRequest.email();
@@ -89,6 +89,7 @@ public class AuthHandler {
         }
         LoginTwoFactorService.LoginChallenge challenge;
         try {
+            //declenche la 2FA :generation OTP+envoi email
             challenge = loginTwoFactorService.initiate(user);
         } catch (Exception e) {
             LOGGER.error("Envoi OTP de connexion impossible pour email={}, ip={}", email, clientIp, e);

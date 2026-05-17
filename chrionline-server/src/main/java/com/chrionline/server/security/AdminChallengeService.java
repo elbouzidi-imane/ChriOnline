@@ -12,7 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public final class AdminChallengeService {
-
+//le challenge fait 32 bytes aleatoirs
+    //il expire apres 30 s
     private static final AdminChallengeService INSTANCE = new AdminChallengeService();
     private static final int CHALLENGE_BYTES = 32;
     private static final long CHALLENGE_TTL_SECONDS = 30;
@@ -23,6 +24,11 @@ public final class AdminChallengeService {
 
     private AdminChallengeService() {
     }
+    //vérifier que l’admin existe
+    //vérifier que sa clé publique existe en base
+
+    //genere un challenge aleatoire
+    //stocker temporairement le challenge
 
     public static AdminChallengeService getInstance() {
         return INSTANCE;
@@ -30,6 +36,7 @@ public final class AdminChallengeService {
 
     public ChallengeResponse createChallenge(String adminEmail) {
         purgeExpired();
+
         User admin = userDAO.findAdminByEmailWithPublicKey(adminEmail);
         if (admin == null) {
             return ChallengeResponse.error("Admin introuvable ou inactif.");
@@ -48,6 +55,7 @@ public final class AdminChallengeService {
                 admin.getEmail(),
                 Instant.now().plusSeconds(CHALLENGE_TTL_SECONDS)
         ));
+        //retourne challenge a client
         System.out.println("[ADMIN] Challenge envoye : " + challenge);
         return ChallengeResponse.ok(challengeId, challenge);
     }
@@ -65,12 +73,12 @@ public final class AdminChallengeService {
         if (pending.expiresAt().isBefore(Instant.now())) {
             return VerificationResult.rejected("Challenge expire.");
         }
-
+//récupérer la clé publique depuis la base
         User admin = userDAO.findAdminByEmailWithPublicKey(pending.adminEmail());
         if (admin == null || admin.getClePubliqueRsa() == null || admin.getClePubliqueRsa().isBlank()) {
             return VerificationResult.rejected("Cle publique admin indisponible.");
         }
-
+     //appeler RsaSignatureUtils.verify
         try {
             System.out.println("[ADMIN] Signature recue du client");
             System.out.println("[ADMIN] Verification signature...");
@@ -79,6 +87,7 @@ public final class AdminChallengeService {
                     Base64.getDecoder().decode(signatureBase64.trim()),
                     RsaSignatureUtils.publicKeyFromBase64(admin.getClePubliqueRsa())
             );
+            //accepter ou refuser l’accès admin
             if (!valid) {
                 System.out.println("[ADMIN] Signature invalide - acces refuse");
                 return VerificationResult.rejected("Signature RSA invalide.");

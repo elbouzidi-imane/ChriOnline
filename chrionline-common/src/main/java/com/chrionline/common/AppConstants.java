@@ -3,6 +3,11 @@ public class AppConstants {
     public static final String HOST     = "localhost";
     public static final int    PORT_TCP = 8080;
     public static final int    PORT_UDP = 8081;
+    public static final int    PORT_PAYMENT_TLS = 8443;
+    public static final int    PAYMENT_TLS_TIMEOUT_MILLIS = 10_000;
+    public static final String PAYMENT_TLS_KEYSTORE_PATH = "chrionline-server/src/main/resources/tls/payment-keystore.jks";
+    public static final String PAYMENT_TLS_TRUSTSTORE_PATH = "chrionline-client/src/main/resources/tls/payment-truststore.jks";
+    public static final String PAYMENT_TLS_STORE_PASSWORD = "changeit";
     public static final long   REQUEST_SIGNATURE_WINDOW_MILLIS = 60_000L;
     public static final String DEFAULT_HMAC_SECRET = "change-this-dev-secret";
     public static final int    TCP_ACCEPT_BACKLOG = 50;
